@@ -165,14 +165,14 @@ CompositeListener.prototype.addScalar = function(scalarname,listenerpack){
   var la = listenerpack.activator;
   if(la){
     sl.a = this.follower.newScalar.sublisten(scalarname,la);
-    if(sv){
+    if(typeof sv !== 'undefined'){
       la();
     }
   }
   var ls = listenerpack.setter;
   if(ls){
     sl.s = this.follower.scalarChanged.sublisten(scalarname,ls);
-    if(sv){
+    if(typeof sv !== 'undefined'){
       ls(sv);
     }
   }
@@ -212,7 +212,18 @@ CompositeListener.prototype.addCollection = function(collectionname,listenerpack
 CompositeListener.prototype.destroy = function(){
   delete this.follower;
   for(var i in this.listeners){
-    this.listeners[i].destroy();
+    var l = this.listeners[i];
+    if(typeof l.destroy === 'function'){
+      l.destroy();
+    }
+    for(var i in l){
+      var _l = l[i];
+      if(typeof _l.destroy === 'function'){
+        _l.destroy();
+      }
+      delete l[i];
+    }
+    delete this.listeners[i];
   }
   delete this.listeners;
 };
@@ -249,13 +260,13 @@ Follower.prototype.deleteCollection = function(collectionname){
     this.collectionRemoved.fire(collectionname);
     if(this.followers[collectionname]){
       this.followers[collectionname].destroy();
-      delete this.listeners[collectionname];
+      delete this.followers[collectionname];
     }
     delete this.collections[collectionname];
   }
 };
 Follower.prototype.pathOf = function(pathelem){
-  return this.path?this.path.concat[pathelem]:[pathelem];
+  return this.path?this.path.concat([pathelem]):([pathelem]);
 };
 Follower.prototype.childFollower = function(name){
   var f = this.followers[name];
@@ -275,8 +286,11 @@ Follower.prototype.childFollower = function(name){
   return f;
 };
 Follower.prototype.follow = function(name){
-  if(!name){
+  if(typeof name === 'undefined'){
     return this;
+  }
+  if(this.followers[name]){
+    return this.followers[name];
   }
   var f = this.childFollower(name);
   this.do_command('/follow',{path:f.path});
@@ -289,6 +303,27 @@ Follower.prototype.listenToCollections = function(ctx,listeners){
   var ret = new CompositeListener(this);
   ret.listenToCollections(listeners);
   return ret;
+};
+Follower.prototype.listenToMultiScalars = function(ctx,scalarnamearry,cb){
+  cb = createCtxActivator(ctx,cb);
+  var ss = this.scalars;
+  function trigger(){
+    var combo = {};
+    for(var i in scalarnamearry){
+      var name = scalarnamearry[i];
+      if(typeof ss[name] === 'undefined'){
+        return;
+      }
+      combo[name] = ss[name];
+    }
+    cb(combo);
+  };
+  var ret = new CompositeListener(this);
+  for(var i in scalarnamearry){
+    ret.addScalar(scalarnamearry[i],{setter:trigger});
+  }
+  return ret;
+
 };
 Follower.prototype.listenToScalars = function(ctx,listeners){
   for(var i in listeners){
@@ -357,6 +392,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
     }
     for(var i in this.scalars){
       if(!(i in allinit)){
+        console.log('deleting',i);
         this.deleteScalar(i);
         this.deleteCollection(i);
       }
@@ -372,6 +408,13 @@ Follower.prototype._subcommit = function(txnalias,txns){
     var chldtxn=chldtxns[i];
     //console.log('child',i,chldtxn);
     this.childFollower(i)._subcommit(txnalias,chldtxn);
+  }
+  if(txnalias==='init'){
+    for(var i in this.followers){
+      if(!i in allinit){
+        this.followers[i]._subcommit(txnalias,[]);
+      }
+    }
   }
 };
 Follower.prototype.commit = function(txns){
