@@ -360,6 +360,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
     var t = txnps[j],name=t[0],value=t[1],sv=this.scalars[name],c=this.collections[name];
     switch(t.length){
       case 2:
+        //console.log('set',name,value);
         if(value!==null){
           this.scalars[name]=value;
           if(typeof sv === 'undefined'){
@@ -373,10 +374,12 @@ Follower.prototype._subcommit = function(txnalias,txns){
             break;
           }
           this.collections[name]=null;
+          //console.log('new collection',name);
           this.newCollection.fire(name);
         }
       break;
       case 1:
+        //console.log('delete',name);
         this.deleteScalar(name);
         this.deleteCollection(name);
       break;
@@ -392,7 +395,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
     }
     for(var i in this.scalars){
       if(!(i in allinit)){
-        console.log('deleting',i);
+        //console.log('deleting',i);
         this.deleteScalar(i);
         this.deleteCollection(i);
       }
@@ -418,9 +421,11 @@ Follower.prototype._subcommit = function(txnalias,txns){
   }
 };
 Follower.prototype.commit = function(txns){
+  //console.log('parent');
   for(var i in txns){
     var txn = txns[i];
     var txnalias = txn[0];
+    //console.log(txnalias);
     this._subcommit(txn[0],txn[1]);
   }
 };
@@ -468,7 +473,13 @@ angular.
           }
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
-            //console.log('response for',command,data,data[0]);
+            if(data.errorcode){
+              if(data.errorcode==='NO_SESSION'){
+                sessionobj = {};
+              }
+              (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
+              return;
+            }
             for(var i in data[0]){
               if(sessionobj.name!==i){
                 if(sessionobj.name){
@@ -511,8 +522,7 @@ angular.
     return function(){
       //transfer('',{},function(){});
       //return;
-      var cb = function(){transfer('',{},cb);};
-      console.log('go');
+      var cb = function(){transfer('',{},cb);};//function(){setTimeout(cb,10);});};
       cb();
     };
   }).
