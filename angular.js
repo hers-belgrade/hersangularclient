@@ -245,6 +245,9 @@ function Follower(commander){
 Follower.prototype.do_command = function(command,paramobj,statuscb){
   (typeof this.commander === 'function') && this.commander(command,paramobj,statuscb);
 };
+Follower.prototype.username = function(){
+  return Follower.username;
+};
 Follower.prototype.setCommander = function(fn){
   this.commander = fn;
 };
@@ -495,6 +498,7 @@ angular.
               }
               sessionobj.value = data[0][i];
             }
+            Follower.username=identity.name;
             follower.commit(data[1]);
             (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
           }).
