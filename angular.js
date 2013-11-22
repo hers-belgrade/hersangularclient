@@ -474,6 +474,7 @@ angular.
   value('identity',{}).
   factory('transfer', function($http,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
     var transfer = function(command,queryobj,cb){
+      command = command||'';
       var attempts = 0;
       if(sessionobj.name){
         queryobj[sessionobj.name]=sessionobj.value;
@@ -485,6 +486,7 @@ angular.
         }
         //console.log('initiating',queryobj);
       }
+      queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
       var worker = (function(_cb){
         var cb = _cb;
@@ -524,7 +526,8 @@ angular.
               (typeof cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage);
             },0);
           }).
-          error(function(){
+          error(function(data,status,headers,config){
+            //console.log('error',status);
             attempts++;
             if(attempts>maxattemptspertimeout){
               attempts=0;
