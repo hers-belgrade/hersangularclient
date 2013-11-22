@@ -242,8 +242,13 @@ function Follower(commander){
   this.destroyed = new CompositeHookCollection();
   this.followers={};
 };
-Follower.prototype.do_command = function(command,paramobj,statuscb){
-  (typeof this.commander === 'function') && this.commander(command,paramobj,statuscb);
+Follower.prototype.do_command = function(command,paramobj,statuscb,ctx){
+  if(ctx&&!statuscb){
+    throw "got ctx and no cb?";
+  }
+  (typeof this.commander === 'function') && this.commander(command,paramobj,ctx?function(){
+    statuscb.apply(ctx,arguments);
+  }:statuscb);
 };
 Follower.prototype.username = function(){
   return Follower.username;
@@ -499,8 +504,11 @@ angular.
               sessionobj.value = data[0][i];
             }
             Follower.username=identity.name;
-            follower.commit(data[1]);
-            (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
+            var _cb=cb;
+            setTimeout(function(){
+              follower.commit(data[1]);
+              (typeof cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage);
+            },0);
           }).
           error(function(){
             attempts++;
