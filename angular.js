@@ -357,6 +357,20 @@ Follower.prototype.listenToScalar = function(ctx,name,listeners){
   ret.addScalar(name,listeners);
   return ret;
 };
+
+Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
+	if (listeners.setter) {
+		var cb = listeners.setter;
+		listeners.setter = function (v, ov) {
+			v = ('undefined' === typeof(v)) ? v : JSON.parse(v);
+			ov = ('undefined' === typeof(ov)) ? ov : JSON.parse(ov);
+			cb.call(this, v, ov);
+		}
+	}
+
+	return this.listenToScalar(ctx, name, listeners);
+}
+
 Follower.prototype.follower = function(name){
   return this.followers[name];
 };
