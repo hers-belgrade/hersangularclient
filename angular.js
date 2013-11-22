@@ -472,6 +472,7 @@ angular.
   constant('maxtimeout',3).
   value('sessionobj',{}).
   value('identity',{}).
+  value('url',window.location.origin||window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '')).
   factory('transfer', function($http,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
     var transfer = function(command,queryobj,cb){
       command = command||'';
