@@ -266,10 +266,12 @@ Follower.prototype.deleteScalar = function(scalarname){
 Follower.prototype.deleteCollection = function(collectionname){
   if(typeof this.collections[collectionname] !== 'undefined'){
     this.collectionRemoved.fire(collectionname);
+    /* leave the follower
     if(this.followers[collectionname]){
       this.followers[collectionname].destroy();
       delete this.followers[collectionname];
     }
+    */
     delete this.collections[collectionname];
   }
 };
@@ -397,6 +399,9 @@ Follower.prototype._subcommit = function(txnalias,txns){
           }
           this.collections[name]=null;
           //console.log('new collection',name);
+          if(this.followers[name]){
+            this.followers[name];//??
+          }
           this.newCollection.fire(name);
         }
       break;
