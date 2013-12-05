@@ -478,7 +478,7 @@ angular.
   value('sessionobj',{}).
   value('identity',{}).
   value('url',window.location.origin||window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '')).
-  factory('transfer', function($http,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
+  factory('transfer', function($http,$timeout, url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
     var transfer = function(command,queryobj,cb){
       command = command||'';
       var attempts = 0;
@@ -527,9 +527,9 @@ angular.
             }
             Follower.username=identity.name;
             var _cb=cb;
-            setTimeout(function(){
+            $timeout(function(){
               follower.commit(data[1]);
-              (typeof cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage);
+              (typeof _cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage);
             },0);
           }).
           error(function(data,status,headers,config){
