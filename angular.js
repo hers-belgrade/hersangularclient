@@ -399,9 +399,11 @@ Follower.prototype._subcommit = function(txnalias,txns){
           }
           this.collections[name]=null;
           //console.log('new collection',name);
+          /*
           if(this.followers[name]){
             this.followers[name];//??
           }
+          */
           this.newCollection.fire(name);
         }
       break;
@@ -478,19 +480,16 @@ angular.
   value('sessionobj',{}).
   value('identity',{}).
   value('url',window.location.origin||window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '')).
-  factory('transfer', function($http,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
+  factory('transfer', function($http,$timeout,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
     var transfer = function(command,queryobj,cb){
       command = command||'';
       var attempts = 0;
       if(sessionobj.name){
         queryobj[sessionobj.name]=sessionobj.value;
-        //console.trace();
-        //console.log('sessioning',queryobj,(new Date()).getTime());
       }else{
         for(var i in identity){
           queryobj[i]=identity[i];
         }
-        //console.log('initiating',queryobj);
       }
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
@@ -510,27 +509,34 @@ angular.
               (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
               return;
             }
-            for(var i in data[0]){
-              if(sessionobj.name!==i){
-                if(sessionobj.name){
-                  sessionobj = {};
-                  (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
-                  return;
+            if(data.username!==identity.name){
+              sessionobj = {};
+              (typeof cb === 'function') && cb();
+              return;
+            }
+            if(data.session){
+              for(var i in data.session){
+                if(sessionobj.name!==i){
+                  if(sessionobj.name){
+                    sessionobj = {};
+                    (typeof cb === 'function') && cb();
+                    return;
+                  }
                 }
+                sessionobj.name = i;
+                if(sessionobj.value!==data.session[i]){
+                  //actually, do nothing. 
+                  //All is handled in the 'init' txn commit
+                }
+                sessionobj.value = data.session[i];
               }
-              sessionobj.name = i;
-              if(sessionobj.value!==data[0][i]){
-                //actually, do nothing. 
-                //All is handled in the 'init' txn commit
-              }
-              sessionobj.value = data[0][i];
             }
             Follower.username=identity.name;
             var _cb=cb;
-            setTimeout(function(){
-              follower.commit(data[1]);
-              (typeof cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage);
-            },0);
+            $timeout(function(){
+              data && data.data && follower.commit(data.data);
+              (typeof cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage,data.results);
+            },1);
           }).
           error(function(data,status,headers,config){
             //console.log('error',status);
@@ -541,29 +547,58 @@ angular.
                 timeout++;
               }
             }
-            setTimeout(_wrk,timeout*1000);
+            $timeout(_wrk,timeout*1000);
           });
         };
         return _wrk;
       })(cb);
       worker();
     };
-    follower.setCommander(function(command,paramobj,statuscb){
-      transfer(command,{paramobj:JSON.stringify(paramobj)},statuscb);
-    });
     return transfer;
   }).
-  factory('go',function(transfer){
+  factory('go',function($timeout,transfer,follower){
     return function(){
-      //transfer('',{},function(){});
-      //return;
-      var cb = function(){transfer('',{},cb);};//function(){setTimeout(cb,10);});};
+      var command_sent=false;
+      var execute = [];
+      var execcb = [];
+      function do_execute(cb){
+        command_sent=true;
+        var ex = execute.splice(0);
+        var excbs = execcb.splice(0);
+        transfer('execute',{commands:ex},function(errcode,errparams,errmessage,results){
+          ex = []; //simple relief
+          if(excbs.length!==results.length){
+            console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
+          }else{
+            for(var i in excbs){
+              excbs[i] && excbs[i].apply(null,results[i]);
+            }
+          }
+          if(execute.length){
+            do_execute();
+          }else{
+            command_sent=false;
+            cb && cb();
+          }
+        });
+      };
+      function do_command(command,paramobj,cb){
+        execute.push([command,paramobj]);
+        execcb.push(cb);
+      };
+      follower.setCommander(function(command,paramobj,statuscb){
+        do_command(command,paramobj,statuscb);
+      });
+      var cb = function(){transfer('_',{},cb);};//function(){setTimeout(cb,10);});};
       cb();
-    };
-  }).
-  factory('listen', function(){
-    return function($http){
-      //console.log('listen');
+      var exec = function(){
+        if(command_sent || (execute.length<1)){
+          $timeout(exec,1);
+        }else{
+          do_execute(exec);
+        }
+      };
+      exec();
     };
   });
 
