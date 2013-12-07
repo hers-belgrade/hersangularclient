@@ -509,9 +509,17 @@ angular.
               (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
               return;
             }
-            if(data.username!==identity.name){
+            if(identity.name && data.username!==identity.name){
+              console.log('oopsadaisy',data.username,'!==',identity.name);
+              if(sessionobj.name){
+                delete queryobj[sessionobj.name];
+              }
+              for(var i in identity){
+                queryobj[i] = identity[i];
+              }
               sessionobj = {};
-              (typeof cb === 'function') && cb();
+              //(typeof cb === 'function') && cb();
+              _wrk();
               return;
             }
             if(data.session){
@@ -532,14 +540,14 @@ angular.
               }
             }
             Follower.username=identity.name;
-            var _cb=cb;
+            var __cb=cb;
             $timeout(function(){
               data && data.data && follower.commit(data.data);
-              (typeof cb === 'function') && _cb(data.errorcode,data.errorparams,data.errormessage,data.results);
+              (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
             },1);
           }).
           error(function(data,status,headers,config){
-            //console.log('error',status);
+            console.log('error',status);
             attempts++;
             if(attempts>maxattemptspertimeout){
               attempts=0;
@@ -575,7 +583,7 @@ angular.
             }
           }
           if(execute.length){
-            do_execute();
+            do_execute(cb);
           }else{
             command_sent=false;
             cb && cb();
@@ -589,7 +597,7 @@ angular.
       follower.setCommander(function(command,paramobj,statuscb){
         do_command(command,paramobj,statuscb);
       });
-      var cb = function(){transfer('_',{},cb);};//function(){setTimeout(cb,10);});};
+      var cb = function(){transfer('_',{},cb);};
       cb();
       var exec = function(){
         if(command_sent || (execute.length<1)){
