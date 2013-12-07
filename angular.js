@@ -573,9 +573,9 @@ angular.
         command_sent=true;
         var ex = execute.splice(0);
         var excbs = execcb.splice(0);
-        transfer('execute',{commands:ex},function(errcode,errparams,errmessage,results){
+        transfer('execute',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
           ex = []; //simple relief
-          if(excbs.length!==results.length){
+          if(excbs.length!==results.length*2){
             console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
           }else{
             for(var i in excbs){
@@ -591,7 +591,7 @@ angular.
         });
       };
       function do_command(command,paramobj,cb){
-        execute.push([command,paramobj]);
+        execute.push(command,paramobj);
         execcb.push(cb);
       };
       follower.setCommander(function(command,paramobj,statuscb){
