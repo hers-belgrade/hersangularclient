@@ -575,7 +575,7 @@ angular.
         var excbs = execcb.splice(0);
         transfer('execute',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
           ex = []; //simple relief
-          if(excbs.length!==results.length*2){
+          if(excbs.length!==results.length){
             console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
           }else{
             for(var i in excbs){
