@@ -573,7 +573,7 @@ angular.
         command_sent=true;
         var ex = execute.splice(0);
         var excbs = execcb.splice(0);
-        transfer('execute',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
+        transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
           ex = []; //simple relief
           if(excbs.length!==results.length){
             console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
