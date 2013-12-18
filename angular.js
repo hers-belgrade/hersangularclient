@@ -575,8 +575,12 @@ angular.
         var excbs = execcb.splice(0);
         transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
           ex = []; //simple relief
-          if(excbs.length!==results.length){
-            console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
+          if(!(results && excbs.length===results.length)){
+            if(!results){
+              console.log('no results');
+            }else{
+              console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
+            }
           }else{
             for(var i in excbs){
               excbs[i] && excbs[i].apply(null,results[i]);
