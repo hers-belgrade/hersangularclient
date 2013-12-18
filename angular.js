@@ -389,8 +389,11 @@ Follower.prototype._subcommit = function(txnalias,txns){
           this.scalars[name]=value;
           if(typeof sv === 'undefined'){
             this.newScalar.fire(name,value);
-          }
-          this.scalarChanged.fire(name,value,sv);
+						this.scalarChanged.fire(name,value,sv);
+          }else{
+						(sv != value) && this.scalarChanged.fire(name,value,sv);
+					}
+          
         }else{
           if(typeof this.collections[name] !== 'undefined'){
             //throw 'already have '+name+' collection';
@@ -424,16 +427,23 @@ Follower.prototype._subcommit = function(txnalias,txns){
     }
     for(var i in this.scalars){
       if(!(i in allinit)){
-        //console.log('deleting',i);
         this.deleteScalar(i);
+      }
+    }
+    for(var i in this.collections){
+      if(!(i in allinit)){
         this.deleteCollection(i);
       }
     }
+		this.init_done = true;
+
+		/*
     //now, re-awake all the needed followers
     for(var i in this.followers){
       //console.log('awaking follower',i);
       this.do_command('/follow',{path:this.followers[i].path});
     }
+		*/
   }
   this.txnEnds.fire(txnalias);
   for(var i in chldtxns){
@@ -441,6 +451,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
     //console.log('child',i,chldtxn);
     this.childFollower(i)._subcommit(txnalias,chldtxn);
   }
+	/*
   if(txnalias==='init'){
     for(var i in this.followers){
       if(!i in allinit){
@@ -448,7 +459,32 @@ Follower.prototype._subcommit = function(txnalias,txns){
       }
     }
   }
+	*/
 };
+
+Follower.prototype._purge = function () {
+	if (this.init_done) {
+		delete this.init_done;
+	}else{
+	this.do_command('/follow',{path:this.path});
+		for(var i in this.scalars){
+			this.deleteScalar(i);
+			//this.deleteCollection(i);
+		}
+		for (var i in this.collections) {
+			this.deleteCollection(i);
+		}
+	}
+	for (var i in this.followers) {
+		this.followers[i]._purge();
+	}
+
+	for(var i in this.followers){
+		//console.log('awaking follower',i);
+	}
+
+
+}
 Follower.prototype.commit = function(txns){
   //console.log('parent');
   for(var i in txns){
@@ -456,6 +492,7 @@ Follower.prototype.commit = function(txns){
     var txnalias = txn[0];
     //console.log(txnalias);
     this._subcommit(txn[0],txn[1]);
+  	if(txnalias==='init') this._purge();
   }
 };
 Follower.prototype.dump = function(){
