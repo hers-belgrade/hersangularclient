@@ -378,13 +378,13 @@ Follower.prototype.follower = function(name){
 };
 Follower.prototype._subcommit = function(txnalias,txns){
   var txnps = txns[0],chldtxns=txns[1];
-  //console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
+  console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
   this.txnBegins.fire(txnalias);
   for(var j in txnps){
     var t = txnps[j],name=t[0],value=t[1],sv=this.scalars[name],c=this.collections[name];
     switch(t.length){
       case 2:
-        //console.log('set',name,value);
+        console.log('set',name,value);
         if(value!==null){
           this.scalars[name]=value;
           if(typeof sv === 'undefined'){
@@ -411,7 +411,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
         }
       break;
       case 1:
-        //console.log('delete',name);
+        console.log('delete',name);
         this.deleteScalar(name);
         this.deleteCollection(name);
       break;
@@ -460,6 +460,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
     }
   }
 	*/
+  console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
 };
 
 Follower.prototype._purge = function () {
@@ -540,9 +541,6 @@ angular.
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
             if(data.errorcode){
-              if(data.errorcode==='NO_SESSION'){
-                sessionobj = {};
-              }
               (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
               return;
             }
@@ -610,26 +608,33 @@ angular.
         command_sent=true;
         var ex = execute.splice(0);
         var excbs = execcb.splice(0);
-        transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
-          ex = []; //simple relief
-          if(!(results && excbs.length===results.length)){
-            if(!results){
-              console.log('no results');
+        var _do_ex = function(){
+          transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
+            if(errcode==='NO_SESSION'){
+              _do_ex();
+              return;
+            }
+            ex = []; //simple relief
+            if(!(results && excbs.length===results.length)){
+              if(!results){
+                console.log('no results');
+              }else{
+                console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
+              }
             }else{
-              console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
+              for(var i in excbs){
+                excbs[i] && excbs[i].apply(null,results[i]);
+              }
             }
-          }else{
-            for(var i in excbs){
-              excbs[i] && excbs[i].apply(null,results[i]);
+            if(execute.length){
+              do_execute(cb);
+            }else{
+              command_sent=false;
+              cb && cb();
             }
-          }
-          if(execute.length){
-            do_execute(cb);
-          }else{
-            command_sent=false;
-            cb && cb();
-          }
-        });
+          });
+        };
+        _do_ex();
       };
       function do_command(command,paramobj,cb){
         execute.push(command,paramobj);
