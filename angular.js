@@ -293,6 +293,9 @@ Follower.prototype.childFollower = function(name){
   var fp = this.pathOf(name);
   f.path = fp;
   this.followers[name] = f;
+  f.destroyed.listen(function(){
+    delete t.followers[name];
+  });
   return f;
 };
 Follower.prototype.follow = function(name){
