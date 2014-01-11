@@ -229,18 +229,10 @@ CompositeListener.prototype.destroy = function(){
 };
 
 function Follower(commander){
-  this.commander = commander;
-  this.scalars = {};
-  this.collections = {};
-  this.txnBegins = new CompositeHookCollection();
-  this.txnEnds = new CompositeHookCollection();
-  this.newScalar = new CompositeHookCollection();
-  this.scalarChanged = new CompositeHookCollection();
-  this.scalarRemoved = new CompositeHookCollection();
-  this.newCollection = new CompositeHookCollection();
-  this.collectionRemoved = new CompositeHookCollection();
-  this.destroyed = new CompositeHookCollection();
-  this.followers={};
+  if(!commander){
+    return;
+  }
+  this.setCommander(commander);
 };
 Follower.prototype.do_command = function(command,paramobj,statuscb,ctx){
   if(ctx&&!statuscb){
@@ -255,6 +247,17 @@ Follower.prototype.username = function(){
 };
 Follower.prototype.setCommander = function(fn){
   this.commander = fn;
+  this.scalars = {};
+  this.collections = {};
+  this.txnBegins = new CompositeHookCollection();
+  this.txnEnds = new CompositeHookCollection();
+  this.newScalar = new CompositeHookCollection();
+  this.scalarChanged = new CompositeHookCollection();
+  this.scalarRemoved = new CompositeHookCollection();
+  this.newCollection = new CompositeHookCollection();
+  this.collectionRemoved = new CompositeHookCollection();
+  this.destroyed = new CompositeHookCollection();
+  this.followers={};
 };
 Follower.prototype.deleteScalar = function(scalarname){
   if(typeof this.scalars[scalarname] !== 'undefined'){
@@ -381,13 +384,13 @@ Follower.prototype.follower = function(name){
 };
 Follower.prototype._subcommit = function(txnalias,txns){
   var txnps = txns[0],chldtxns=txns[1];
-  console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
+  //console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
   this.txnBegins.fire(txnalias);
   for(var j in txnps){
     var t = txnps[j],name=t[0],value=t[1],sv=this.scalars[name],c=this.collections[name];
     switch(t.length){
       case 2:
-        console.log('set',name,value);
+        //console.log('set',name,value);
         if(value!==null){
           this.scalars[name]=value;
           if(typeof sv === 'undefined'){
@@ -414,7 +417,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
         }
       break;
       case 1:
-        console.log('delete',name);
+        //console.log('delete',name);
         this.deleteScalar(name);
         this.deleteCollection(name);
       break;
@@ -463,7 +466,7 @@ Follower.prototype._subcommit = function(txnalias,txns){
     }
   }
 	*/
-  console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
+  //console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
 };
 
 Follower.prototype._purge = function () {
@@ -577,6 +580,8 @@ angular.
                 sessionobj.value = data.session[i];
               }
             }
+            identity.name = data.username;
+            identity.roles = data.roles;
             Follower.username=identity.name;
             var __cb=cb;
             $timeout(function(){
