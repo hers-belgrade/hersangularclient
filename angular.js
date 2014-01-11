@@ -607,7 +607,7 @@ angular.
     };
     return transfer;
   }).
-  factory('go',function($timeout,transfer,follower){
+  factory('go',function($timeout,transfer,follower,sessionobj){
     return function(){
       var command_sent=false;
       var execute = [];
@@ -619,6 +619,7 @@ angular.
         var _do_ex = function(){
           transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
             if(errcode==='NO_SESSION'){
+              sessionobj = {};
               _do_ex();
               return;
             }
