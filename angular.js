@@ -103,6 +103,17 @@ CompositeHookCollection.prototype.sublisten = function(name,cb){
   }
   return createListener(sh,cb);
 };
+CompositeHookCollection.prototype.subsublisten = function(name,other,cb){
+  if(!this.subsubhooks){
+    this.subsubhooks = {};
+  }
+  var ssh = this.subsubhooks[name+'|'+other];
+  if(!ssh){
+    ssh = new HookCollection();
+    this.subsubhooks[name+'|'+other] = ssh;
+  }
+  return createListener(ssh,cb);
+};
 CompositeHookCollection.prototype.fire = function(){
   var args = Array.prototype.slice.call(arguments);
   this.hook.fire.apply(this.hook,args);
@@ -111,6 +122,15 @@ CompositeHookCollection.prototype.fire = function(){
   if(sh){
     sh.fire.apply(sh,args);
   }
+  if(this.subsubhooks){
+    var other = args.shift();
+    if(other){
+      var ssh = this.subsubhooks[name+'|'+other];
+      if(ssh){
+        ssh.fire.apply(ssh,args);
+      }
+    }
+  }
 };
 CompositeHookCollection.prototype.destruct = function(){
   this.hook.destruct();
@@ -118,6 +138,12 @@ CompositeHookCollection.prototype.destruct = function(){
     this.subhooks[i].destruct();
   }
   delete this.subhooks;
+  if(this.subsubhooks){
+    for(var i in this.subsubhooks){
+      this.subsubhooks[i].destruct();
+    }
+    delete this.subsubhooks;
+  }
 };
 
 function CompositeListener(follower){
@@ -179,6 +205,38 @@ CompositeListener.prototype.addScalar = function(scalarname,listenerpack){
   var ld = listenerpack.deactivator;
   if(ld){
     sl.d = this.follower.scalarRemoved.sublisten(scalarname,ld);
+  }
+};
+CompositeListener.prototype.listenToUsers = function(listenerpack){
+  var sl = this._getClearListener('/users/');
+  var la = listenerpack.activator;
+  if(la){
+    sl.a = this.follower.newUser.listen(la);
+    for(var _r in this.follower.realms){
+      var r = this.follower.realms[_r];
+      for(var _un in r){
+        la(_un,_r);
+      }
+    }
+  }
+  var ld = listenerpack.deactivator;
+  if(ld){
+    sl.d = this.follower.userRemoved.listen(ld);
+  }
+};
+CompositeListener.prototype.addUser = function(username,realmname,listenerpack){
+  var sl = this._getClearListener(collectionname);
+  var la = listenerpack.activator;
+  if(la){
+    sl.a = this.follower.newCollection.subsublisten(username,realmname,la);
+    var r = this.follower.realms[realmname];
+    if(typeof r !== 'undefined' && r.indexOf(username) >= 0){
+      la();
+    }
+  }
+  var ld = listenerpack.deactivator;
+  if(ld){
+    sl.d = this.follower.userRemoved.subsublisten(username,realmname,ld);
   }
 };
 CompositeListener.prototype.listenToCollections = function(listenerpack){
@@ -249,6 +307,7 @@ Follower.prototype.setCommander = function(fn){
   this.commander = fn;
   this.scalars = {};
   this.collections = {};
+  this.realms = {};
   this.txnBegins = new CompositeHookCollection();
   this.txnEnds = new CompositeHookCollection();
   this.newScalar = new CompositeHookCollection();
@@ -256,6 +315,10 @@ Follower.prototype.setCommander = function(fn){
   this.scalarRemoved = new CompositeHookCollection();
   this.newCollection = new CompositeHookCollection();
   this.collectionRemoved = new CompositeHookCollection();
+  this.newRealm = new CompositeHookCollection();
+  this.newUser = new CompositeHookCollection();
+  this.realmRemoved = new CompositeHookCollection();
+  this.userRemoved = new CompositeHookCollection();
   this.destroyed = new CompositeHookCollection();
   this.followers={};
 };
@@ -365,7 +428,6 @@ Follower.prototype.listenToScalar = function(ctx,name,listeners){
   ret.addScalar(name,listeners);
   return ret;
 };
-
 Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 	if (listeners.setter) {
 		var cb = listeners.setter;
@@ -375,16 +437,52 @@ Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 			cb.call(this, v, ov);
 		}
 	}
-
 	return this.listenToScalar(ctx, name, listeners);
-}
-
+};
+Follower.prototype.listenToUsers = function(ctx,listeners){
+  for(var i in listeners){
+    listeners[i] = createCtxActivator(ctx,listeners[i]);
+  }
+  var ret = new CompositeListener(this);
+  ret.listenToUsers(listeners);
+  return ret;
+};
 Follower.prototype.follower = function(name){
   return this.followers[name];
 };
+Follower.prototype.performUserOp = function(userop){
+  var op = userop[0], un = userop[1], rn = userop[2];
+  switch(userop[0]){
+    case 1:
+      if(!this.realms[rn]){
+        this.realms[rn] = [un];
+        this.newRealm.fire(rn);
+      }else{
+        this.realms[rn].push(un);
+        this.newUser.fire(un,rn);
+      }
+      break;
+    case 2:
+      if(this.realms[rn]){
+        var ui = this.realms[rn].indexOf(un);
+        if(ui>=0){
+          this.userRemoved.fire(un,rn);
+          this.realms[rn].splice(ui,1);
+          if(!this.realms[rn].length){
+            this.realmRemoved.fire(rn);
+            delete this.realms[rn];
+          }
+        }
+      }
+      break;
+  }
+};
 Follower.prototype._subcommit = function(txnalias,txns){
-  var txnps = txns[0],chldtxns=txns[1];
+  var txnpack = txns[0],txnps = txnpack[0], userops = txnpack[1], chldtxns=txns[1];
   //console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
+  for(var i in userops){
+    this.performUserOp(userops[i]);
+  }
   this.txnBegins.fire(txnalias);
   for(var j in txnps){
     var t = txnps[j],name=t[0],value=t[1],sv=this.scalars[name],c=this.collections[name];
@@ -512,6 +610,10 @@ Follower.prototype.destroy = function(){
   this.scalarRemoved.destruct();
   this.newCollection.destruct();
   this.collectionRemoved.destruct();
+  this.newRealm.destruct();
+  this.newUser.destruct();
+  this.realmRemoved.destruct();
+  this.userRemoved.destruct();
   this.destroyed.fire();
   this.destroyed.destruct();
 };
