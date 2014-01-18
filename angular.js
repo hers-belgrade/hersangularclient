@@ -478,7 +478,7 @@ Follower.prototype.performUserOp = function(userop){
   }
 };
 Follower.prototype._subcommit = function(txnalias,txns){
-  var txnpack = txns[0],txnps = txnpack[0], userops = txnpack[1], chldtxns=txns[1];
+  var txnpack = txns[0],txnps = txnpack&&txnpack.length>0?txnpack[0]:[], userops = txnpack&&txnpack.length>1?txnpack[1]:[], chldtxns=txns[1];
   //console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
   for(var i in userops){
     this.performUserOp(userops[i]);
