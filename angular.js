@@ -590,8 +590,8 @@ Follower.prototype._purge = function () {
 
 
 }
-Follower.prototype.commit = function(txns){
-  //console.log('parent');
+Follower.prototype._commit = function(txns){
+  //console.log(txns.length,'txns');
   for(var i in txns){
     var txn = txns[i];
     var txnalias = txn[0];
@@ -599,6 +599,19 @@ Follower.prototype.commit = function(txns){
     this._subcommit(txn[0],txn[1]);
   	if(txnalias==='init') this._purge();
   }
+  if(this.commitqueue && this.commitqueue.length){
+    this._commit(this.commitqueue.shift());
+  }
+  //console.log('commit queue empty');
+};
+Follower.prototype.commit = function(txns){
+  if(!this.commitqueue){
+    this.commitqueue = [txns];
+  }else{
+    this.commitqueue.push(txns);
+  }
+  //console.log('commit queue',this.commitqueue.length);
+  this._commit(this.commitqueue.shift());
 };
 Follower.prototype.dump = function(){
 };
