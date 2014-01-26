@@ -477,7 +477,54 @@ Follower.prototype.performUserOp = function(userop){
       break;
   }
 };
-Follower.prototype._subcommit = function(txnalias,txns){
+Follower.prototype._subcommit = function(t){
+  if(!(t&&t.length)){return;}
+  var name = t[0], value = t[1];
+  switch(t.length){
+    case 2:
+      if(name===null){
+        if(this.txnalias){
+          this.txnEnds.fire(value);
+          delete this.txnalias;
+        }else{
+          this.txnalias = value;
+          this.txnBegins.fire(value);
+        }
+        return;
+      }
+      //console.log('set',name,value);
+      if(value!==null){
+        this.scalars[name]=value;
+        if(typeof sv === 'undefined'){
+          this.newScalar.fire(name,value);
+          this.scalarChanged.fire(name,value,sv);
+        }else{
+          (sv != value) && this.scalarChanged.fire(name,value,sv);
+        }
+        
+      }else{
+        if(typeof this.collections[name] !== 'undefined'){
+          //throw 'already have '+name+' collection';
+          //don't panic, it may be the 'init'
+          break;
+        }
+        this.collections[name]=null;
+        //console.log('new collection',name);
+        /*
+        if(this.followers[name]){
+          this.followers[name];//??
+        }
+        */
+        this.newCollection.fire(name);
+      }
+    break;
+    case 1:
+      //console.log('delete',name);
+      this.deleteScalar(name);
+      this.deleteCollection(name);
+    break;
+  }
+  return;
   var txnpack = txns[0],txnps = txnpack&&txnpack.length>0?txnpack[0]:[], userops = txnpack&&txnpack.length>1?txnpack[1]:[], chldtxns=txns[1];
   //console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
   for(var i in userops){
@@ -591,13 +638,20 @@ Follower.prototype._purge = function () {
 
 }
 Follower.prototype.commit = function(txns){
-  //console.log('parent');
   for(var i in txns){
-    var txn = txns[i];
-    var txnalias = txn[0];
-    //console.log(txnalias);
-    this._subcommit(txn[0],txn[1]);
-  	if(txnalias==='init') this._purge();
+    var txn = JSON.parse(txns[i]);
+    for(var i in txn){
+      txn[i] = typeof txn[i] === 'string' ? JSON.parse(txn[i]) : txn[i];
+    }
+    var path = txn[0], target = this;
+    console.log('path',path,'value',txn[1]);
+    while(target && path.length){
+      target = target.childFollower(path.splice(0,1)[0]);
+    }
+    if(target){
+      target._subcommit(txn[1]);
+    }
+  	//if(txnalias==='init') this._purge();
   }
 };
 Follower.prototype.dump = function(){
