@@ -634,24 +634,29 @@ Follower.prototype._purge = function () {
 	for(var i in this.followers){
 		//console.log('awaking follower',i);
 	}
-
-
+};
+Follower.prototype.parseAndCommit = function(txnstr){
+  var txn = JSON.parse(txnstr);
+  for(var i in txn){
+    txn[i] = typeof txn[i] === 'string' ? JSON.parse(txn[i]) : txn[i];
+  }
+  var path = txn[0], target = this;
+  //console.log('path',path,'value',txn[1]);
+  while(target && path.length){
+    target = target.childFollower(path.splice(0,1)[0]);
+  }
+  if(target){
+    target._subcommit(txn[1]);
+  }
+  //if(txnalias==='init') this._purge();
 }
 Follower.prototype.commit = function(txns){
+  if(typeof txns === 'string'){
+    this.parseAndCommit(txns);
+    return;
+  }
   for(var i in txns){
-    var txn = JSON.parse(txns[i]);
-    for(var i in txn){
-      txn[i] = typeof txn[i] === 'string' ? JSON.parse(txn[i]) : txn[i];
-    }
-    var path = txn[0], target = this;
-    console.log('path',path,'value',txn[1]);
-    while(target && path.length){
-      target = target.childFollower(path.splice(0,1)[0]);
-    }
-    if(target){
-      target._subcommit(txn[1]);
-    }
-  	//if(txnalias==='init') this._purge();
+    this.parseAndCommit(txns[i]);
   }
 };
 Follower.prototype.dump = function(){
@@ -673,14 +678,14 @@ Follower.prototype.destroy = function(){
 };
 
 angular.
-  module('HERS', []).
+  module('HERS', ['btford.socket-io']).
   constant('follower',new Follower()).
   constant('maxattemptspertimeout',5).
   constant('maxtimeout',3).
   value('sessionobj',{}).
   value('identity',{}).
   value('url',window.location.origin||window.location.protocol + "//" + window.location.hostname + (window.location.port ? ':' + window.location.port: '')).
-  factory('transfer', function($http,$timeout,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout){
+  factory('transfer', function($http,$timeout,url,follower,identity,sessionobj,maxattemptspertimeout,maxtimeout,socketFactory){
     var transfer = function(command,queryobj,cb){
       command = command||'';
       var attempts = 0;
@@ -740,6 +745,24 @@ angular.
             identity.roles = data.roles;
             Follower.username=identity.name;
             var __cb=cb;
+            if(!(follower.waitingforsockio||follower.socketio)){
+              follower.waitingforsockio=true;
+              var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username)});
+              sio.on('socket:error', function(reason){
+                __cb();
+              });
+              sio.on('disconnect', function(){
+                __cb();
+              });
+              sio.on('connect', function(){
+                console.log('connected');
+                delete follower.waitingforsockio;
+                follower.socketio = sio;
+              });
+              sio.on('_',function(data){
+                follower.commit(data);
+              });
+            }
             $timeout(function(){
               data && data.data && follower.commit(data.data);
               (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
@@ -769,6 +792,30 @@ angular.
       var execute = [];
       var execcb = [];
       function do_execute(cb){
+        if(follower.socketio){
+          if(!follower.subscribedtoResult){
+            follower.subscribedtoResult = true;
+            var excbs = execcb;
+            follower.socketio.on('=',function(data){
+              //console.log('result',data);
+              var results = data.results;
+              while(excbs.length){
+                var excb = excbs.shift();
+                var res = results.shift();
+                excb && excb.apply(null,res);
+              }
+              console.log(results.length,'results left');
+              if(execute.length){
+                do_execute(cb);
+              }else{
+                command_sent=false;
+                cb && cb();
+              }
+            });
+          }
+          follower.socketio.emit('!',execute.splice(0));
+          return;
+        }
         command_sent=true;
         var ex = execute.splice(0);
         var excbs = execcb.splice(0);
@@ -808,7 +855,7 @@ angular.
       follower.setCommander(function(command,paramobj,statuscb){
         do_command(command,paramobj,statuscb);
       });
-      var cb = function(){transfer('_',{},cb);};
+      var cb = function(){if(follower.socketio){return;}transfer('_',{},cb);};
       cb();
       var exec = function(){
         if(command_sent || (execute.length<1)){
