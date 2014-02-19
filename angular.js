@@ -342,7 +342,11 @@ Follower.prototype.deleteCollection = function(collectionname){
   }
 };
 Follower.prototype.pathOf = function(pathelem){
-  return this.path?this.path.concat([pathelem]):([pathelem]);
+  if(this.path){
+    return pathelem ? this.path.concat([pathelem]) : this.path;
+  }else{
+    return pathelem ? [pathelem] : [];
+  }
 };
 Follower.prototype.childFollower = function(name){
   var f = this.followers[name];
@@ -374,6 +378,9 @@ Follower.prototype.follow = function(name){
   var f = this.childFollower(name);
   this.do_command('/follow',{path:f.path});
   return f;
+};
+Follower.prototype.unfollow = function(name){
+  this.do_command('/unfollow',{path:this.pathOf(name)});
 };
 Follower.prototype.listenToCollections = function(ctx,listeners){
   for(var i in listeners){
@@ -747,15 +754,21 @@ angular.
             var __cb=cb;
             if(!(follower.waitingforsockio||follower.socketio)){
               follower.waitingforsockio=true;
-              var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username)});
+              var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username,{
+                'reconnect':false,
+                'force new connection':true
+              })});
+              console.log('time for socket.io',sio,data);
               sio.on('socket:error', function(reason){
                 __cb();
               });
               sio.on('disconnect', function(){
+                delete follower.socketio;
+                console.log('calling __cb because disconnect');
                 __cb();
               });
               sio.on('connect', function(){
-                console.log('connected');
+                console.log('socket.io connected');
                 delete follower.waitingforsockio;
                 follower.socketio = sio;
               });
@@ -804,7 +817,7 @@ angular.
                 var res = results.shift();
                 excb && excb.apply(null,res);
               }
-              console.log(results.length,'results left');
+              //console.log(results.length,'results left');
               if(execute.length){
                 do_execute(cb);
               }else{
@@ -821,6 +834,7 @@ angular.
         var excbs = execcb.splice(0);
         var _do_ex = function(){
           transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
+            console.log('transfer done',arguments);
             if(errcode==='NO_SESSION'){
               sessionobj = {};
               _do_ex();
