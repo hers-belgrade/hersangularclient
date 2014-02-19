@@ -657,14 +657,28 @@ Follower.prototype.parseAndCommit = function(txnstr){
   }
   //if(txnalias==='init') this._purge();
 }
-Follower.prototype.commit = function(txns){
+Follower.prototype._commit = function(txns){
   if(typeof txns === 'string'){
     this.parseAndCommit(txns);
     return;
   }
+  //console.log(txns.length,'txns');
   for(var i in txns){
     this.parseAndCommit(txns[i]);
   }
+  if(this.commitqueue && this.commitqueue.length){
+    this._commit(this.commitqueue.shift());
+  }
+  //console.log('commit queue empty');
+};
+Follower.prototype.commit = function(txns){
+  if(!this.commitqueue){
+    this.commitqueue = [txns];
+  }else{
+    this.commitqueue.push(txns);
+  }
+  //console.log('commit queue',this.commitqueue.length);
+  this._commit(this.commitqueue.shift());
 };
 Follower.prototype.dump = function(){
 };
