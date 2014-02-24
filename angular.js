@@ -343,9 +343,9 @@ Follower.prototype.deleteCollection = function(collectionname){
 };
 Follower.prototype.pathOf = function(pathelem){
   if(this.path){
-    return pathelem ? this.path.concat([pathelem]) : this.path;
+    return typeof pathelem === 'undefined' ? this.path : this.path.concat([pathelem]);
   }else{
-    return pathelem ? [pathelem] : [];
+    return typeof pathelem === 'undefined' ? [] : [pathelem] ;
   }
 };
 Follower.prototype.childFollower = function(name){
@@ -487,6 +487,7 @@ Follower.prototype.performUserOp = function(userop){
 Follower.prototype._subcommit = function(t){
   if(!(t&&t.length)){return;}
   var name = t[0], value = t[1];
+  //console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -516,7 +517,7 @@ Follower.prototype._subcommit = function(t){
           break;
         }
         this.collections[name]=null;
-        //console.log('new collection',name);
+        console.log(this.path,'new collection',name);
         /*
         if(this.followers[name]){
           this.followers[name];//??
@@ -827,9 +828,11 @@ angular.
               //console.log('result',data);
               var results = data.results;
               while(excbs.length){
-                var excb = excbs.shift();
-                var res = results.shift();
-                excb && excb.apply(null,res);
+                if(results){
+                  var excb = excbs.shift();
+                  var res = results.shift();
+                  excb && excb.apply(null,res);
+                }
               }
               //console.log(results.length,'results left');
               if(execute.length){
