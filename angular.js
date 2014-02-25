@@ -502,6 +502,7 @@ Follower.prototype._subcommit = function(t){
       }
       //console.log('set',name,value);
       if(value!==null){
+        var sv = this.scalars[name];
         this.scalars[name]=value;
         if(typeof sv === 'undefined'){
           this.newScalar.fire(name,value);
@@ -517,7 +518,7 @@ Follower.prototype._subcommit = function(t){
           break;
         }
         this.collections[name]=null;
-        console.log(this.path,'new collection',name);
+        //console.log(this.path,'new collection',name);
         /*
         if(this.followers[name]){
           this.followers[name];//??
@@ -851,7 +852,7 @@ angular.
         var excbs = execcb.splice(0);
         var _do_ex = function(){
           transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
-            console.log('transfer done',arguments);
+            //console.log('transfer done',arguments);
             if(errcode==='NO_SESSION'){
               sessionobj = {};
               _do_ex();
