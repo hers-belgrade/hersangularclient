@@ -355,7 +355,8 @@ Follower.prototype.childFollower = function(name){
   }
   var t = this;
   f = new Follower(function(command,paramobj,statuscb){
-    if(command.charAt(0)!=='/'){
+    var fc = command.charAt(0);
+    if(fc!=='/' && fc!==':'){
       command = name+'/'+command;
     }
     t.do_command(command,paramobj,statuscb);
@@ -376,11 +377,11 @@ Follower.prototype.follow = function(name){
     return this.followers[name];
   }
   var f = this.childFollower(name);
-  this.do_command('/follow',{path:f.path});
+  this.do_command(':follow',{path:f.path});
   return f;
 };
 Follower.prototype.unfollow = function(name){
-  this.do_command('/unfollow',{path:this.pathOf(name)});
+  this.do_command(':unfollow',{path:this.pathOf(name)});
 };
 Follower.prototype.listenToCollections = function(ctx,listeners){
   for(var i in listeners){
@@ -623,18 +624,21 @@ Follower.prototype._subcommit = function(t){
   //console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
 };
 
+Follower.prototype.clear = function() {
+  for(var i in this.scalars){
+    this.deleteScalar(i);
+    //this.deleteCollection(i);
+  }
+  for (var i in this.collections) {
+    this.deleteCollection(i);
+  }
+};
 Follower.prototype._purge = function () {
 	if (this.init_done) {
 		delete this.init_done;
 	}else{
-	this.do_command('/follow',{path:this.path});
-		for(var i in this.scalars){
-			this.deleteScalar(i);
-			//this.deleteCollection(i);
-		}
-		for (var i in this.collections) {
-			this.deleteCollection(i);
-		}
+	this.do_command(':follow',{path:this.path});
+    this.clear();
 	}
 	for (var i in this.followers) {
 		this.followers[i]._purge();
