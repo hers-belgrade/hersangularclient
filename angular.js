@@ -832,13 +832,11 @@ angular.
             follower.socketio.on('=',function(data){
               //console.log('result',data);
               var results = data.results;
-              while(excbs.length){
-                if(results){
-                  var excb = excbs.shift();
-                  var res = results.shift();
-                  excb && excb.apply(null,res);
-                }
-              }
+							while(excbs.length && results && results.length){  
+								var excb = excbs.shift();
+								var res = results.shift();
+								excb && excb.apply(null,res);
+							}
               //console.log(results.length,'results left');
               if(execute.length){
                 do_execute(cb);
