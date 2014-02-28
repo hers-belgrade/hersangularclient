@@ -513,6 +513,7 @@ Follower.prototype._subcommit = function(t){
         }
         
       }else{
+        console.log(name,'created');
         if(typeof this.collections[name] !== 'undefined'){
           //throw 'already have '+name+' collection';
           //don't panic, it may be the 'init'
@@ -529,7 +530,9 @@ Follower.prototype._subcommit = function(t){
       }
     break;
     case 1:
-      //console.log('delete',name);
+      if(typeof this.collections[name] !== 'undefined'){
+        console.log(name,'dying');
+      }
       this.deleteScalar(name);
       this.deleteCollection(name);
     break;
@@ -678,6 +681,7 @@ Follower.prototype._commit = function(txns){
   //console.log('commit queue empty');
 };
 Follower.prototype.commit = function(txns){
+  //console.log(txns);
   if(!this.commitqueue){
     this.commitqueue = [txns];
   }else{
@@ -772,7 +776,7 @@ angular.
             identity.roles = data.roles;
             Follower.username=identity.name;
             var __cb=cb;
-            if(!(follower.waitingforsockio||follower.socketio)){
+            if(data.errorcode !== 'NO_SESSION' && !(follower.waitingforsockio||follower.socketio)){
               follower.waitingforsockio=true;
               var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username,{
                 'reconnect':false,
@@ -832,7 +836,7 @@ angular.
             follower.socketio.on('=',function(data){
               //console.log('result',data);
               var results = data.results;
-							while(excbs.length && results && results.length){  
+							while(excbs.length){  
 								var excb = excbs.shift();
 								var res = results.shift();
 								excb && excb.apply(null,res);
