@@ -341,14 +341,15 @@ Follower.prototype.deleteCollection = function(collectionname){
     delete this.collections[collectionname];
   }
 };
-Follower.prototype.pathOf = function(pathelem){
+Follower.prototype.pathOf = function(pathelem,passthru){
+  var pe = passthru ? [[pathelem,true]] : [pathelem];
   if(this.path){
-    return typeof pathelem === 'undefined' ? this.path : this.path.concat([pathelem]);
+    return typeof pathelem === 'undefined' ? this.path : this.path.concat(pe);
   }else{
-    return typeof pathelem === 'undefined' ? [] : [pathelem] ;
+    return typeof pathelem === 'undefined' ? [] : pe ;
   }
 };
-Follower.prototype.childFollower = function(name){
+Follower.prototype.childFollower = function(name,passthru){
   var f = this.followers[name];
   if(f){
     return f;
@@ -361,7 +362,7 @@ Follower.prototype.childFollower = function(name){
     }
     t.do_command(command,paramobj,statuscb);
   });
-  var fp = this.pathOf(name);
+  var fp = this.pathOf(name,passthru);
   f.path = fp;
   this.followers[name] = f;
   f.destroyed.listen(function(){
@@ -369,14 +370,14 @@ Follower.prototype.childFollower = function(name){
   });
   return f;
 };
-Follower.prototype.follow = function(name){
+Follower.prototype.follow = function(name,passthru){
   if(typeof name === 'undefined'){
     return this;
   }
   if(this.followers[name]){
     return this.followers[name];
   }
-  var f = this.childFollower(name);
+  var f = this.childFollower(name,passthru);
   this.do_command(':follow',{path:f.path});
   return f;
 };
@@ -513,7 +514,7 @@ Follower.prototype._subcommit = function(t){
         }
         
       }else{
-        console.log(name,'created');
+        //console.log(name,'created');
         if(typeof this.collections[name] !== 'undefined'){
           //throw 'already have '+name+' collection';
           //don't panic, it may be the 'init'
@@ -530,9 +531,11 @@ Follower.prototype._subcommit = function(t){
       }
     break;
     case 1:
+      /*
       if(typeof this.collections[name] !== 'undefined'){
         console.log(name,'dying');
       }
+      */
       this.deleteScalar(name);
       this.deleteCollection(name);
     break;
