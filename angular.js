@@ -527,10 +527,9 @@ angular.
       var attempts = 0;
       if(sessionobj.name){
         queryobj[sessionobj.name]=sessionobj.value;
-      }else{
-        for(var i in identity){
-          queryobj[i]=identity[i];
-        }
+      }
+      for(var i in identity){
+        queryobj[i]=identity[i];
       }
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
@@ -612,7 +611,7 @@ angular.
         var ex = execute.splice(0);
         var excbs = execcb.splice(0);
         var _do_ex = function(){
-          transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
+          transfer('!',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
             if(errcode==='NO_SESSION'){
               sessionobj = {};
               _do_ex();
