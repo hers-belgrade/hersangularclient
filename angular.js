@@ -303,6 +303,15 @@ Follower.prototype.do_command = function(command,paramobj,statuscb,ctx){
 Follower.prototype.username = function(){
   return Follower.username;
 };
+
+Follower.prototype.realmname = function () {
+  return Follower.realm;
+}
+
+Follower.prototype.full_username = function () {
+  return this.username()+'@'+this.realmname();
+}
+
 Follower.prototype.setCommander = function(fn){
   this.commander = fn;
   this.scalars = {};
@@ -389,6 +398,7 @@ Follower.prototype.follow = function(name,passthru){
 Follower.prototype.unfollow = function(name){
   this.do_command(':unfollow',{path:this.pathOf(name)});
 };
+
 Follower.prototype.listenToCollections = function(ctx,listeners){
   for(var i in listeners){
     listeners[i] = createCtxActivator(ctx,listeners[i]);
@@ -781,7 +791,9 @@ angular.
             }
             identity.name = data.username;
             identity.roles = data.roles;
+            identity.realm = data.realm;
             Follower.username=identity.name;
+            Follower.realm = identity.realm
             var __cb=cb;
             if(data.errorcode !== 'NO_SESSION' && !(follower.waitingforsockio||follower.socketio)){
               follower.waitingforsockio=true;
@@ -882,6 +894,7 @@ angular.
         console.log(execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
+
       follower.setCommander(function(command,paramobj,statuscb){
         do_command(command,paramobj,statuscb);
       });
