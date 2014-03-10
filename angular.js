@@ -378,7 +378,12 @@ Follower.prototype.follow = function(name,passthru){
     return this.followers[name];
   }
   var f = this.childFollower(name,passthru);
-  this.do_command(':follow',{path:f.path});
+  this.do_command(':follow',{path:f.path},function(errcb){
+    if((errcb==='OK') && (typeof this.collections[name] === 'undefined')){
+      this.collections[name] = null;
+      this.newCollection.fire(name);
+    }
+  },this);
   return f;
 };
 Follower.prototype.unfollow = function(name){
@@ -631,6 +636,9 @@ Follower.prototype._subcommit = function(t){
 };
 
 Follower.prototype.clear = function() {
+  for(var i in this.followers){
+    this.followers[i].clear();
+  }
   for(var i in this.scalars){
     this.deleteScalar(i);
     //this.deleteCollection(i);
@@ -639,20 +647,15 @@ Follower.prototype.clear = function() {
     this.deleteCollection(i);
   }
 };
+Follower.prototype.refollowServer = function(){
+  this.do_command(':follow',{path:this.path});
+  for(var i in this.followers){
+    this.followers[i].refollowServer();
+  }
+};
 Follower.prototype._purge = function () {
-	if (this.init_done) {
-		delete this.init_done;
-	}else{
-	this.do_command(':follow',{path:this.path});
-    this.clear();
-	}
-	for (var i in this.followers) {
-		this.followers[i]._purge();
-	}
-
-	for(var i in this.followers){
-		//console.log('awaking follower',i);
-	}
+  this.clear();
+  this.refollowServer();
 };
 Follower.prototype.parseAndCommit = function(txnstr){
   var txn = JSON.parse(txnstr);
@@ -725,10 +728,9 @@ angular.
       var attempts = 0;
       if(sessionobj.name){
         queryobj[sessionobj.name]=sessionobj.value;
-      }else{
-        for(var i in identity){
-          queryobj[i]=identity[i];
-        }
+      }
+      for(var i in identity){
+        queryobj[i]=identity[i];
       }
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
@@ -763,6 +765,8 @@ angular.
                 if(sessionobj.name!==i){
                   if(sessionobj.name){
                     sessionobj = {};
+                    console.log('time for purge');
+                    follower._purge();
                     (typeof cb === 'function') && cb();
                     return;
                   }
@@ -831,81 +835,58 @@ angular.
       var command_sent=false;
       var execute = [];
       var execcb = [];
+      function do_results(results){
+        if(!results){return;}
+        while(results.length){  
+          var excb = execcb.shift();
+          //console.log(execute[0],execute[1],'=>',results[0]);
+          var res = results.shift();
+          execute.shift();
+          execute.shift();
+          excb && excb.apply(null,res);
+        }
+        if(execute.length && (execute.length == execcb.length*2)){ //new pack
+          do_execute();
+        }else{
+          console.log('execcb left',execute);
+        }
+      };
       function do_execute(cb){
         if(follower.socketio){
-          if(!follower.subscribedtoResult){
-            follower.subscribedtoResult = true;
-            var excbs = execcb;
+          if(!follower.socketio.subscribedtoResult){
+            follower.socketio.subscribedtoResult = true;
             follower.socketio.on('=',function(data){
-              //console.log('result',data);
-              var results = data.results;
-							while(excbs.length){  
-								var excb = excbs.shift();
-								var res = results.shift();
-								excb && excb.apply(null,res);
-							}
-              //console.log(results.length,'results left');
-              if(execute.length){
-                do_execute(cb);
-              }else{
-                command_sent=false;
-                cb && cb();
-              }
+              do_results(data.results);
             });
           }
-          follower.socketio.emit('!',execute.splice(0));
+          follower.socketio.emit('!',execute.slice());
           return;
         }
         command_sent=true;
-        var ex = execute.splice(0);
-        var excbs = execcb.splice(0);
         var _do_ex = function(){
-          transfer('executeDCP',{commands:JSON.stringify(ex)},function(errcode,errparams,errmessage,results){
-            //console.log('transfer done',arguments);
+          transfer('!',{commands:JSON.stringify(execute.slice())},function(errcode,errparams,errmessage,results){
             if(errcode==='NO_SESSION'){
               sessionobj = {};
               _do_ex();
               return;
             }
-            ex = []; //simple relief
-            if(!(results && excbs.length===results.length)){
-              if(!results){
-                console.log('no results');
-              }else{
-                console.log('length mismatch, cbs length',excbs.length,'result length',results.length);
-              }
-            }else{
-              for(var i in excbs){
-                excbs[i] && excbs[i].apply(null,results[i]);
-              }
-            }
-            if(execute.length){
-              do_execute(cb);
-            }else{
-              command_sent=false;
-              cb && cb();
-            }
+            do_results(results);
           });
         };
         _do_ex();
       };
       function do_command(command,paramobj,cb){
+        var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
+        console.log(execute.length,execcb.length);
+        if(shouldfire){do_execute()}
       };
       follower.setCommander(function(command,paramobj,statuscb){
         do_command(command,paramobj,statuscb);
       });
       var cb = function(){if(follower.socketio){return;}transfer('_',{},cb);};
       cb();
-      var exec = function(){
-        if(command_sent || (execute.length<1)){
-          $timeout(exec,1);
-        }else{
-          do_execute(exec);
-        }
-      };
-      exec();
     };
   });
 
