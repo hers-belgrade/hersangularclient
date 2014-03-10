@@ -292,6 +292,22 @@ function Follower(commander){
   }
   this.setCommander(commander);
 };
+
+Follower.prototype.getPath = function () {
+  var ret = '';
+  for (var i in this.path) {
+    if (ret.length) ret+='/';
+    if (this.path[i] instanceof Array) {
+      ret += this.path[i][0];
+      continue;
+    }else {
+      ret += this.path[i];
+    }
+  }
+  return ret;
+};
+
+
 Follower.prototype.do_command = function(command,paramobj,statuscb,ctx){
   if(ctx&&!statuscb){
     throw "got ctx and no cb?";
