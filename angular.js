@@ -520,7 +520,7 @@ Follower.prototype.performUserOp = function(userop){
 Follower.prototype._subcommit = function(t){
   if(!(t&&t.length)){return;}
   var name = t[0], value = t[1];
-  //console.log(this.path,name,value);
+  console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -683,29 +683,33 @@ Follower.prototype._purge = function () {
   this.clear();
   this.refollowServer();
 };
-Follower.prototype.parseAndCommit = function(txnstr){
-  var txn = JSON.parse(txnstr);
-  for(var i in txn){
-    txn[i] = typeof txn[i] === 'string' ? JSON.parse(txn[i]) : txn[i];
-  }
-  var path = txn[0], target = this;
+Follower.prototype.commitOne = function(primitive){
+  var path = primitive[0], target = this;
   //console.log('path',path,'value',txn[1]);
   while(target && path.length){
     target = target.childFollower(path.splice(0,1)[0]);
   }
   if(target){
-    target._subcommit(txn[1]);
+    target._subcommit(primitive[1]);
   }
   //if(txnalias==='init') this._purge();
+};
+Follower.prototype.parseAndCommit = function(txnstr){
+  var txn = JSON.parse(txnstr);
+  for(var i in txn){
+    txn[i] = typeof txn[i] === 'string' ? JSON.parse(txn[i]) : txn[i];
+  }
+  this.commitOne(txn);
 }
 Follower.prototype._commit = function(txns){
   if(typeof txns === 'string'){
+    console.log('parseAndCommit',txns);
     this.parseAndCommit(txns);
     return;
   }
   //console.log(txns.length,'txns');
   for(var i in txns){
-    this.parseAndCommit(txns[i]);
+    this.commitOne(txns[i]);
   }
   if(this.commitqueue && this.commitqueue.length){
     this._commit(this.commitqueue.shift());
@@ -713,11 +717,10 @@ Follower.prototype._commit = function(txns){
   //console.log('commit queue empty');
 };
 Follower.prototype.commit = function(txns){
-  //console.log(txns);
   if(!this.commitqueue){
-    this.commitqueue = [txns];
+    this.commitqueue = txns;
   }else{
-    this.commitqueue.push(txns);
+    this.commitqueue.push.apply(this.commitqueue,txns);
   }
   //console.log('commit queue',this.commitqueue.length);
   this._commit(this.commitqueue.shift());
@@ -832,7 +835,7 @@ angular.
                 follower.socketio = sio;
               });
               sio.on('_',function(data){
-                follower.commit(data);
+                follower.commitOne(data);
               });
             }
             $timeout(function(){
