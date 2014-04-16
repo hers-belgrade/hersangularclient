@@ -907,7 +907,6 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        console.log(execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
