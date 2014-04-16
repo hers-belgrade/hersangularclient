@@ -118,9 +118,11 @@ CompositeHookCollection.prototype.fire = function(){
   var args = Array.prototype.slice.call(arguments);
   this.hook.fire.apply(this.hook,args);
   var name = args.shift();
-  var sh = this.subhooks[name];
-  if(sh){
-    sh.fire.apply(sh,args);
+  if(this.subhooks){
+    var sh = this.subhooks[name];
+    if(sh){
+      sh.fire.apply(sh,args);
+    }
   }
   if(this.subsubhooks){
     var other = args.shift();
@@ -321,7 +323,7 @@ Follower.prototype.username = function(){
 };
 
 Follower.prototype.realmname = function () {
-  return Follower.realm;
+  return Follower.realmname;
 }
 
 Follower.prototype.full_username = function () {
@@ -344,6 +346,7 @@ Follower.prototype.setCommander = function(fn){
   this.newUser = new CompositeHookCollection();
   this.realmRemoved = new CompositeHookCollection();
   this.userRemoved = new CompositeHookCollection();
+  this.onReset = new CompositeHookCollection();
   this.destroyed = new CompositeHookCollection();
   this.followers={};
 };
@@ -367,7 +370,8 @@ Follower.prototype.deleteCollection = function(collectionname){
   }
 };
 Follower.prototype.pathOf = function(pathelem,passthru){
-  var pe = passthru ? [[pathelem,true]] : [pathelem];
+  //var pe = passthru ? [[pathelem,true]] : [pathelem];
+  var pe = [pathelem];
   if(this.path){
     return typeof pathelem === 'undefined' ? this.path : this.path.concat(pe);
   }else{
@@ -520,6 +524,16 @@ Follower.prototype.performUserOp = function(userop){
 Follower.prototype._subcommit = function(t){
   if(!(t&&t.length)){return;}
   var name = t[0], value = t[1];
+  if(name && name.charAt(0)===':'){
+    var methodname = name.substring(1);
+    var method = this[methodname];
+    if(typeof method === 'function'){
+      console.log(this.path,'invoking',methodname,value);
+      method.apply(this,value);
+    }else{
+      console.log(this.path,'has not method',methodname);
+    }
+  }
   console.log(this.path,name,value);
   switch(t.length){
     case 2:
@@ -673,6 +687,16 @@ Follower.prototype.clear = function() {
     this.deleteCollection(i);
   }
 };
+Follower.prototype.reset = function(){
+  for(var i in this.followers){
+    this.followers[i].reset();
+    this.followers[i].destroy();
+    console.log(this.path,'destroying',i);
+    delete this.followers[i];
+  }
+  this.clear();
+  this.onReset.fire();
+};
 Follower.prototype.refollowServer = function(){
   this.do_command(':follow',this.path);
   for(var i in this.followers){
@@ -684,10 +708,16 @@ Follower.prototype._purge = function () {
   this.refollowServer();
 };
 Follower.prototype.commitOne = function(primitive){
+  if(!primitive){return;}
   var path = primitive[0], target = this;
   //console.log('path',path,'value',txn[1]);
-  while(target && path.length){
-    target = target.childFollower(path.splice(0,1)[0]);
+  while(target && path && path.length){
+    var pe = path.shift();
+    if(typeof target.collections[pe] === 'undefined'){
+      target.collections[pe]=null;
+      target.newCollection.fire(pe);
+    }
+    target = target.childFollower(pe);
   }
   if(target){
     target._subcommit(primitive[1]);
@@ -708,9 +738,12 @@ Follower.prototype._commit = function(txns){
     return;
   }
   //console.log(txns.length,'txns');
+  /*
   for(var i in txns){
     this.commitOne(txns[i]);
   }
+  */
+  this.commitOne(txns);
   if(this.commitqueue && this.commitqueue.length){
     this._commit(this.commitqueue.shift());
   }
@@ -739,6 +772,7 @@ Follower.prototype.destroy = function(){
   this.newUser.destruct();
   this.realmRemoved.destruct();
   this.userRemoved.destruct();
+  this.onReset.destruct();
   this.destroyed.fire();
   this.destroyed.destruct();
 };
@@ -809,10 +843,10 @@ angular.
               }
             }
             identity.name = data.username;
+            identity.realm = data.realmname;
             identity.roles = data.roles;
-            identity.realm = data.realm;
-            Follower.username=identity.name;
-            Follower.realm = identity.realm
+            Follower.username = identity.name;
+            Follower.realmname = identity.realm;
             var __cb=cb;
             if(data.errorcode !== 'NO_SESSION' && !(follower.waitingforsockio||follower.socketio)){
               follower.waitingforsockio=true;
