@@ -534,7 +534,7 @@ Follower.prototype._subcommit = function(t){
       console.log(this.path,'has not method',methodname);
     }
   }
-  console.log(this.path,name,value);
+  //console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -750,6 +750,11 @@ Follower.prototype._commit = function(txns){
   //console.log('commit queue empty');
 };
 Follower.prototype.commit = function(txns){
+  /*
+  for(var i in txns){
+    console.log(this.path,txns[i][0],txns[i][1]);
+  }
+  */
   if(!this.commitqueue){
     this.commitqueue = txns;
   }else{
