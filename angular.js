@@ -528,13 +528,14 @@ Follower.prototype._subcommit = function(t){
     var methodname = name.substring(1);
     var method = this[methodname];
     if(typeof method === 'function'){
-      console.log(this.path,'invoking',methodname,value);
+      //console.log(this.path,'invoking',methodname,value);
       method.apply(this,value);
     }else{
       console.log(this.path,'has not method',methodname);
     }
+    return;
   }
-  console.log(this.path,name,value);
+  //console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -691,7 +692,7 @@ Follower.prototype.reset = function(){
   for(var i in this.followers){
     this.followers[i].reset();
     this.followers[i].destroy();
-    console.log(this.path,'destroying',i);
+    //console.log(this.path,'destroying',i);
     delete this.followers[i];
   }
   this.clear();
@@ -913,7 +914,7 @@ angular.
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
         }else{
-          console.log('execcb left',execute);
+          //console.log('execcb left',execute);
         }
       };
       function do_execute(cb){
@@ -944,7 +945,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        console.log(execute.length,execcb.length);
+        //console.log(execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
