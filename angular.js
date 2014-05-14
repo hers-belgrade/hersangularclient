@@ -528,14 +528,14 @@ Follower.prototype._subcommit = function(t){
     var methodname = name.substring(1);
     var method = this[methodname];
     if(typeof method === 'function'){
-      //console.log(this.path,'invoking',methodname,value);
+      console.log(this.path,'invoking',methodname,value);
       method.apply(this,value);
     }else{
       console.log(this.path,'has not method',methodname);
     }
     return;
   }
-  //console.log(this.path,name,value);
+  console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -738,17 +738,10 @@ Follower.prototype._commit = function(txns){
     this.parseAndCommit(txns);
     return;
   }
-  //console.log(txns.length,'txns');
-  /*
-  for(var i in txns){
-    this.commitOne(txns[i]);
-  }
-  */
   this.commitOne(txns);
   if(this.commitqueue && this.commitqueue.length){
     this._commit(this.commitqueue.shift());
   }
-  //console.log('commit queue empty');
 };
 Follower.prototype.commit = function(txns){
   if(!this.commitqueue){
@@ -756,7 +749,6 @@ Follower.prototype.commit = function(txns){
   }else{
     this.commitqueue.push.apply(this.commitqueue,txns);
   }
-  //console.log('commit queue',this.commitqueue.length);
   this._commit(this.commitqueue.shift());
 };
 Follower.prototype.dump = function(){
