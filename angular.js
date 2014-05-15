@@ -416,7 +416,7 @@ Follower.prototype.follow = function(name,passthru){
   return f;
 };
 Follower.prototype.unfollow = function(name){
-  this.do_command(':unfollow',{path:this.pathOf(name)});
+  //this.do_command(':unfollow',{path:this.pathOf(name)});
 };
 
 Follower.prototype.listenToCollections = function(ctx,listeners){
