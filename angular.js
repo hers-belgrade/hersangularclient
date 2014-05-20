@@ -31,6 +31,9 @@ HookCollection.prototype.attach = function(cb){
   }
 };
 HookCollection.prototype.detach = function(i){
+  if(!this.collection[i]){
+    console.warn('no event handler for',i);
+  }
 	delete this.collection[i];
 };
 HookCollection.prototype.fire = function(){
@@ -716,7 +719,7 @@ Follower.prototype._purge = function () {
 Follower.prototype.commitOne = function(primitive){
   if(!primitive){return;}
   var path = primitive[0], target = this;
-  //console.log('path',path,'value',txn[1]);
+  //console.log(primitive[0],primitive[1]);
   while(target && path && path.length){
     var pe = path.shift();
     if(typeof target.collections[pe] === 'undefined'){
