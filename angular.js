@@ -77,11 +77,16 @@ HookCollection.prototype.destruct = function(){
     delete this.collection[i];
   }
 }
+function dummyHook(){};
 function createListener(hook,cb){
   var hi = hook.attach(cb);
-  return {destroy:function(){
+  var ret = {destroy:function(){
     hook.detach(hi);
-  }};
+    cb = null;
+    hi = null;
+    ret.destroy = dummyHook;
+  }}
+  return ret;
 };
 function createCtxActivator(ctx,cb){
   return function(){
@@ -528,14 +533,14 @@ Follower.prototype._subcommit = function(t){
     var methodname = name.substring(1);
     var method = this[methodname];
     if(typeof method === 'function'){
-      console.log(this.path,'invoking',methodname,value);
+      //console.log(this.path,'invoking',methodname,value);
       method.apply(this,value);
     }else{
       console.log(this.path,'has not method',methodname);
     }
     return;
   }
-  console.log(this.path,name,value);
+  c//onsole.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -905,9 +910,8 @@ angular.
         }
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
-        }else{
-          //console.log('execcb left',execute);
         }
+        //console.log('execcb left',execute);
       };
       function do_execute(cb){
         if(follower.socketio){
@@ -937,7 +941,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        //console.log(execute.length,execcb.length);
+        //console.log(command,execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
