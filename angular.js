@@ -31,7 +31,11 @@ HookCollection.prototype.attach = function(cb){
   }
 };
 HookCollection.prototype.detach = function(i){
+  if(!this.collection){
+    return;
+  }
   if(!this.collection[i]){
+    console.trace();
     console.warn('no event handler for',i);
   }
 	delete this.collection[i];
@@ -75,9 +79,8 @@ HookCollection.prototype.fireAndForget = function(){
 }
 */
 HookCollection.prototype.destruct = function(){
-  //console.log('destructing');
-  for(var i in this.collection){
-    delete this.collection[i];
+  for(var i in this){
+    delete this[i];
   }
 }
 function dummyHook(){};
@@ -720,6 +723,7 @@ Follower.prototype.commitOne = function(primitive){
   if(!primitive){return;}
   var path = primitive[0], target = this;
   //console.log(primitive[0],primitive[1]);
+  //console.log(JSON.stringify(primitive));
   while(target && path && path.length){
     var pe = path.shift();
     if(typeof target.collections[pe] === 'undefined'){
@@ -796,21 +800,30 @@ angular.
       for(var i in identity){
         queryobj[i]=identity[i];
       }
+      if(!(queryobj.name&&sessionobj.name)){
+        if(follower.anonymousattempts){
+          $timeout((function(c,q,cb){
+            var _c=c,_q=q,_cb=cb;
+            return function(){
+              transfer(_c,_q,_cb);
+            };
+          })(command,queryobj,cb),100);
+          return;
+        }
+        follower.anonymousattempts=1;
+      }
+      console.log(command,queryobj);
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
       var worker = (function(_cb){
         var cb = _cb;
         var _wrk = function(){
-          //$http.get(url+command+querystring).
           if(command&&(command[0]!=='/')){
             command = '/'+command;
           }
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
-            if(data.errorcode){
-              (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
-              return;
-            }
+            console.log(command,'=>',data);
             if(identity.name && data.username!==identity.name){
               console.log('oopsadaisy',data.username,'!==',identity.name);
               if(sessionobj.name){
@@ -820,8 +833,7 @@ angular.
                 queryobj[i] = identity[i];
               }
               sessionobj = {};
-              //(typeof cb === 'function') && cb();
-              _wrk();
+              $timeout(_wrk,data.session?1:10000);
               return;
             }
             if(data.session){
@@ -842,44 +854,54 @@ angular.
                 }
                 sessionobj.value = data.session[i];
               }
+              if(!(follower.waitingforsockio||follower.socketio)){
+                follower.waitingforsockio=true;
+                var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username,{
+                  'reconnect':false,
+                  'force new connection':true
+                })});
+                console.log('time for socket.io',sio,data);
+                sio.on('socket:error', function(reason){
+                  __cb();
+                });
+                sio.on('disconnect', function(){
+                  delete follower.socketio;
+                  delete follower.anonymousattempts;
+                  delete sessionobj.name;
+                  console.log('calling __cb because disconnect');
+                  __cb();
+                });
+                sio.on('connect', function(){
+                  console.log('socket.io connected');
+                  delete follower.waitingforsockio;
+                  follower.socketio = sio;
+                });
+                sio.on('_',function(data){
+                  follower.commitOne(data);
+                });
+              }
             }
             identity.name = data.username;
             identity.realm = data.realmname;
             identity.roles = data.roles;
             Follower.username = identity.name;
             Follower.realmname = identity.realm;
-            var __cb=cb;
-            if(data.errorcode !== 'NO_SESSION' && !(follower.waitingforsockio||follower.socketio)){
-              follower.waitingforsockio=true;
-              var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username,{
-                'reconnect':false,
-                'force new connection':true
-              })});
-              console.log('time for socket.io',sio,data);
-              sio.on('socket:error', function(reason){
-                __cb();
-              });
-              sio.on('disconnect', function(){
-                delete follower.socketio;
-                console.log('calling __cb because disconnect');
-                __cb();
-              });
-              sio.on('connect', function(){
-                console.log('socket.io connected');
-                delete follower.waitingforsockio;
-                follower.socketio = sio;
-              });
-              sio.on('_',function(data){
-                follower.commitOne(data);
-              });
+            if(identity.name){
+              //delete follower.anonymousattempts;
             }
+            var __cb=cb;
             $timeout(function(){
               data && data.data && follower.commit(data.data);
               (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
-            },1);
+            },data.session ? 1 : 10000);
           }).
           error(function(data,status,headers,config){
             console.log('error',status);
+            if(status==401){
+              delete identity.name;
+              delete identity.realm;
+              return;
+            }
             attempts++;
             if(attempts>maxattemptspertimeout){
               attempts=0;
@@ -905,7 +927,7 @@ angular.
         if(!results){return;}
         while(results.length){  
           var excb = execcb.shift();
-          //console.log(execute[0],execute[1],'=>',results[0]);
+          console.log(execute[0],execute[1],'=>',results[0]);
           var res = results.shift();
           execute.shift();
           execute.shift();
@@ -914,7 +936,7 @@ angular.
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
         }
-        //console.log('execcb left',execute);
+        console.log('execcb left',execute);
       };
       function do_execute(cb){
         if(follower.socketio){
@@ -944,7 +966,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        //console.log(command,execute.length,execcb.length);
+        console.log(command,execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
