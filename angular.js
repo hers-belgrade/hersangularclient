@@ -687,6 +687,12 @@ Follower.prototype._subcommit = function(t){
   //console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
 };
 
+Follower.prototype.disconnect = function(){
+  var s = this.socketio;
+  if(s){
+    s.disconnect();
+  }
+};
 Follower.prototype.clear = function() {
   for(var i in this.followers){
     this.followers[i].clear();
