@@ -487,8 +487,8 @@ Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 	if (listeners.setter) {
 		var cb = listeners.setter;
 		listeners.setter = function (v, ov) {
-			v = ('undefined' === typeof(v)) ? v : JSON.parse(v);
-			ov = ('undefined' === typeof(ov)) ? ov : JSON.parse(ov);
+      v = ('undefined' !== typeof(v) && v.length) ? JSON.parse(v) : undefined;
+      ov = ('undefined' !== typeof(ov) && ov.length) ? JSON.parse(ov) : undefined;
 			cb.call(this, v, ov);
 		}
 	}
