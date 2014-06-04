@@ -418,12 +418,14 @@ Follower.prototype.follow = function(name,passthru){
     return this.followers[name];
   }
   var f = this.childFollower(name,passthru);
+  /*
   this.do_command(':follow',f.path,function(errcb){
     if((errcb==='OK') && (typeof this.collections[name] === 'undefined')){
       this.collections[name] = null;
       this.newCollection.fire(name);
     }
   },this);
+  */
   return f;
 };
 Follower.prototype.unfollow = function(name){
@@ -546,7 +548,7 @@ Follower.prototype._subcommit = function(t){
     }
     return;
   }
-  c//onsole.log(this.path,name,value);
+  console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -716,10 +718,12 @@ Follower.prototype.reset = function(){
   this.onReset.fire();
 };
 Follower.prototype.refollowServer = function(){
+  /*
   this.do_command(':follow',this.path);
   for(var i in this.followers){
     this.followers[i].refollowServer();
   }
+  */
 };
 Follower.prototype._purge = function () {
   this.clear();
