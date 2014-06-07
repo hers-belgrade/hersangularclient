@@ -418,7 +418,6 @@ Follower.prototype.follow = function(name,passthru){
     return this.followers[name];
   }
   var f = this.childFollower(name,passthru);
-
   /*
   this.do_command(':follow',f.path,function(errcb){
     if((errcb==='OK') && (typeof this.collections[name] === 'undefined')){
@@ -719,10 +718,12 @@ Follower.prototype.reset = function(){
   this.onReset.fire();
 };
 Follower.prototype.refollowServer = function(){
+  /*
   this.do_command(':follow',this.path);
   for(var i in this.followers){
     this.followers[i].refollowServer();
   }
+  */
 };
 Follower.prototype._purge = function () {
   this.clear();
