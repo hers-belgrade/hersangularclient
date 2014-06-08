@@ -418,12 +418,14 @@ Follower.prototype.follow = function(name,passthru){
     return this.followers[name];
   }
   var f = this.childFollower(name,passthru);
+  /*
   this.do_command(':follow',f.path,function(errcb){
     if((errcb==='OK') && (typeof this.collections[name] === 'undefined')){
       this.collections[name] = null;
       this.newCollection.fire(name);
     }
   },this);
+  */
   return f;
 };
 Follower.prototype.unfollow = function(name){
@@ -487,8 +489,8 @@ Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 	if (listeners.setter) {
 		var cb = listeners.setter;
 		listeners.setter = function (v, ov) {
-			v = ('undefined' === typeof(v)) ? v : JSON.parse(v);
-			ov = ('undefined' === typeof(ov)) ? ov : JSON.parse(ov);
+      v = ('undefined' !== typeof(v) && v.length) ? JSON.parse(v) : undefined;
+      ov = ('undefined' !== typeof(ov) && ov.length) ? JSON.parse(ov) : undefined;
 			cb.call(this, v, ov);
 		}
 	}
@@ -546,7 +548,7 @@ Follower.prototype._subcommit = function(t){
     }
     return;
   }
-  c//onsole.log(this.path,name,value);
+  //console.log(this.path,name,value);
   switch(t.length){
     case 2:
       if(name===null){
@@ -559,7 +561,7 @@ Follower.prototype._subcommit = function(t){
         }
         return;
       }
-      //console.log('set',name,value);
+      console.log('set',name,value);
       if(value!==null){
         var sv = this.scalars[name];
         this.scalars[name]=value;
@@ -717,10 +719,12 @@ Follower.prototype.reset = function(){
   this.onReset.fire();
 };
 Follower.prototype.refollowServer = function(){
+  /*
   this.do_command(':follow',this.path);
   for(var i in this.followers){
     this.followers[i].refollowServer();
   }
+  */
 };
 Follower.prototype._purge = function () {
   this.clear();
@@ -819,7 +823,7 @@ angular.
         }
         follower.anonymousattempts=1;
       }
-      console.log(command,queryobj);
+      //console.log(command,queryobj);
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
       var worker = (function(_cb){
@@ -830,7 +834,7 @@ angular.
           }
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
-            console.log(command,'=>',data);
+            //console.log(command,'=>',data);
             if(identity.name && data.username!==identity.name){
               console.log('oopsadaisy',data.username,'!==',identity.name);
               if(sessionobj.name){
@@ -867,7 +871,7 @@ angular.
                   'reconnect':false,
                   'force new connection':true
                 })});
-                console.log('time for socket.io',sio,data);
+                //console.log('time for socket.io',sio,data);
                 sio.on('socket:error', function(reason){
                   __cb();
                 });
@@ -879,7 +883,7 @@ angular.
                   __cb();
                 });
                 sio.on('connect', function(){
-                  console.log('socket.io connected');
+                  //console.log('socket.io connected');
                   delete follower.waitingforsockio;
                   follower.socketio = sio;
                 });
@@ -934,7 +938,7 @@ angular.
         if(!results){return;}
         while(results.length){  
           var excb = execcb.shift();
-          console.log(execute[0],execute[1],'=>',results[0]);
+          //console.log(execute[0],execute[1],'=>',results[0]);
           var res = results.shift();
           execute.shift();
           execute.shift();
@@ -943,7 +947,7 @@ angular.
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
         }
-        console.log('execcb left',execute);
+        //console.log('execcb left',execute);
       };
       function do_execute(cb){
         if(follower.socketio){
@@ -973,7 +977,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        console.log(command,execute.length,execcb.length);
+        //console.log(command,execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
