@@ -690,7 +690,8 @@ Follower.prototype._subcommit = function(t){
 Follower.prototype.disconnect = function(){
   var s = this.socketio;
   if(s){
-    s.disconnect();
+    delete this.socketio;
+    s=null;
   }
 };
 Follower.prototype.clear = function() {
@@ -889,7 +890,7 @@ angular.
             }
             identity.name = data.username;
             identity.realm = data.realmname;
-            identity.roles = data.roles;
+            identity.roles = data.roles ? data.roles.split(',') : [];
             Follower.username = identity.name;
             Follower.realmname = identity.realm;
             if(identity.name){
