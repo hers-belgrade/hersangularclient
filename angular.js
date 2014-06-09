@@ -561,7 +561,6 @@ Follower.prototype._subcommit = function(t){
         }
         return;
       }
-      console.log('set',name,value);
       if(value!==null){
         var sv = this.scalars[name];
         this.scalars[name]=value;
