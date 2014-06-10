@@ -818,7 +818,7 @@ angular.
         }
         follower.anonymousattempts=1;
       }
-      console.log(command,queryobj);
+      //console.log(command,queryobj);
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
       var worker = (function(_cb){
@@ -829,7 +829,7 @@ angular.
           }
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
-            console.log(command,'=>',data);
+            //console.log(command,'=>',data);
             if(identity.name && data.username!==identity.name){
               console.log('oopsadaisy',data.username,'!==',identity.name);
               if(sessionobj.name){
@@ -866,19 +866,18 @@ angular.
                   'reconnect':false,
                   'force new connection':true
                 })});
-                console.log('time for socket.io',sio,data);
+                //console.log('time for socket.io',sio,data);
                 sio.on('socket:error', function(reason){
                   __cb();
                 });
                 sio.on('disconnect', function(){
                   delete follower.socketio;
                   delete follower.anonymousattempts;
-                  delete sessionobj.name;
                   console.log('calling __cb because disconnect');
                   __cb();
                 });
                 sio.on('connect', function(){
-                  console.log('socket.io connected');
+                  //console.log('socket.io connected');
                   delete follower.waitingforsockio;
                   follower.socketio = sio;
                 });
@@ -933,7 +932,7 @@ angular.
         if(!results){return;}
         while(results.length){  
           var excb = execcb.shift();
-          console.log(execute[0],execute[1],'=>',results[0]);
+          //console.log(execute[0],execute[1],'=>',results[0]);
           var res = results.shift();
           execute.shift();
           execute.shift();
@@ -942,7 +941,7 @@ angular.
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
         }
-        console.log('execcb left',execute);
+        //console.log('execcb left',execute);
       };
       function do_execute(cb){
         if(follower.socketio){
@@ -972,7 +971,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        console.log(command,execute.length,execcb.length);
+        //console.log(command,execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
