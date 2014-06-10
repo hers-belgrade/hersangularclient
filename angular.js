@@ -877,7 +877,6 @@ angular.
                 sio.on('disconnect', function(){
                   delete follower.socketio;
                   delete follower.anonymousattempts;
-                  delete sessionobj.name;
                   console.log('calling __cb because disconnect');
                   __cb();
                 });
