@@ -31,6 +31,13 @@ HookCollection.prototype.attach = function(cb){
   }
 };
 HookCollection.prototype.detach = function(i){
+  if(!this.collection){
+    return;
+  }
+  if(!this.collection[i]){
+    console.trace();
+    console.warn('no event handler for',i);
+  }
 	delete this.collection[i];
 };
 HookCollection.prototype.fire = function(){
@@ -72,16 +79,20 @@ HookCollection.prototype.fireAndForget = function(){
 }
 */
 HookCollection.prototype.destruct = function(){
-  //console.log('destructing');
-  for(var i in this.collection){
-    delete this.collection[i];
+  for(var i in this){
+    delete this[i];
   }
 }
+function dummyHook(){};
 function createListener(hook,cb){
   var hi = hook.attach(cb);
-  return {destroy:function(){
+  var ret = {destroy:function(){
     hook.detach(hi);
-  }};
+    cb = null;
+    hi = null;
+    ret.destroy = dummyHook;
+  }}
+  return ret;
 };
 function createCtxActivator(ctx,cb){
   return function(){
@@ -407,16 +418,18 @@ Follower.prototype.follow = function(name,passthru){
     return this.followers[name];
   }
   var f = this.childFollower(name,passthru);
+  /*
   this.do_command(':follow',f.path,function(errcb){
     if((errcb==='OK') && (typeof this.collections[name] === 'undefined')){
       this.collections[name] = null;
       this.newCollection.fire(name);
     }
   },this);
+  */
   return f;
 };
 Follower.prototype.unfollow = function(name){
-  this.do_command(':unfollow',{path:this.pathOf(name)});
+  //this.do_command(':unfollow',{path:this.pathOf(name)});
 };
 
 Follower.prototype.listenToCollections = function(ctx,listeners){
@@ -476,8 +489,8 @@ Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 	if (listeners.setter) {
 		var cb = listeners.setter;
 		listeners.setter = function (v, ov) {
-			v = ('undefined' === typeof(v)) ? v : JSON.parse(v);
-			ov = ('undefined' === typeof(ov)) ? ov : JSON.parse(ov);
+      v = ('undefined' !== typeof(v) && v.length) ? JSON.parse(v) : undefined;
+      ov = ('undefined' !== typeof(ov) && ov.length) ? JSON.parse(ov) : undefined;
 			cb.call(this, v, ov);
 		}
 	}
@@ -528,11 +541,12 @@ Follower.prototype._subcommit = function(t){
     var methodname = name.substring(1);
     var method = this[methodname];
     if(typeof method === 'function'){
-      console.log(this.path,'invoking',methodname,value);
+      //console.log(this.path,'invoking',methodname,value);
       method.apply(this,value);
     }else{
       console.log(this.path,'has not method',methodname);
     }
+    return;
   }
   //console.log(this.path,name,value);
   switch(t.length){
@@ -675,6 +689,12 @@ Follower.prototype._subcommit = function(t){
   //console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
 };
 
+Follower.prototype.disconnect = function(){
+  var s = this.socketio;
+  if(s){
+    s.disconnect();
+  }
+};
 Follower.prototype.clear = function() {
   for(var i in this.followers){
     this.followers[i].clear();
@@ -691,7 +711,7 @@ Follower.prototype.reset = function(){
   for(var i in this.followers){
     this.followers[i].reset();
     this.followers[i].destroy();
-    console.log(this.path,'destroying',i);
+    //console.log(this.path,'destroying',i);
     delete this.followers[i];
   }
   this.clear();
@@ -710,7 +730,8 @@ Follower.prototype._purge = function () {
 Follower.prototype.commitOne = function(primitive){
   if(!primitive){return;}
   var path = primitive[0], target = this;
-  //console.log('path',path,'value',txn[1]);
+  console.log(primitive[0],primitive[1]);
+  //console.log(JSON.stringify(primitive));
   while(target && path && path.length){
     var pe = path.shift();
     if(typeof target.collections[pe] === 'undefined'){
@@ -737,17 +758,10 @@ Follower.prototype._commit = function(txns){
     this.parseAndCommit(txns);
     return;
   }
-  //console.log(txns.length,'txns');
-  /*
-  for(var i in txns){
-    this.commitOne(txns[i]);
-  }
-  */
   this.commitOne(txns);
   if(this.commitqueue && this.commitqueue.length){
     this._commit(this.commitqueue.shift());
   }
-  //console.log('commit queue empty');
 };
 Follower.prototype.commit = function(txns){
   /*
@@ -760,7 +774,6 @@ Follower.prototype.commit = function(txns){
   }else{
     this.commitqueue.push.apply(this.commitqueue,txns);
   }
-  //console.log('commit queue',this.commitqueue.length);
   this._commit(this.commitqueue.shift());
 };
 Follower.prototype.dump = function(){
@@ -800,21 +813,30 @@ angular.
       for(var i in identity){
         queryobj[i]=identity[i];
       }
+      if(!(queryobj.name&&sessionobj.name)){
+        if(follower.anonymousattempts){
+          $timeout((function(c,q,cb){
+            var _c=c,_q=q,_cb=cb;
+            return function(){
+              transfer(_c,_q,_cb);
+            };
+          })(command,queryobj,cb),100);
+          return;
+        }
+        follower.anonymousattempts=1;
+      }
+      console.log(command,queryobj);
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
       var worker = (function(_cb){
         var cb = _cb;
         var _wrk = function(){
-          //$http.get(url+command+querystring).
           if(command&&(command[0]!=='/')){
             command = '/'+command;
           }
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
-            if(data.errorcode){
-              (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage);
-              return;
-            }
+            console.log(command,'=>',data);
             if(identity.name && data.username!==identity.name){
               console.log('oopsadaisy',data.username,'!==',identity.name);
               if(sessionobj.name){
@@ -824,8 +846,7 @@ angular.
                 queryobj[i] = identity[i];
               }
               sessionobj = {};
-              //(typeof cb === 'function') && cb();
-              _wrk();
+              $timeout(_wrk,data.session?1:10000);
               return;
             }
             if(data.session){
@@ -846,44 +867,54 @@ angular.
                 }
                 sessionobj.value = data.session[i];
               }
+              if(!(follower.waitingforsockio||follower.socketio)){
+                follower.waitingforsockio=true;
+                var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username,{
+                  'reconnect':false,
+                  'force new connection':true
+                })});
+                console.log('time for socket.io',sio,data);
+                sio.on('socket:error', function(reason){
+                  __cb();
+                });
+                sio.on('disconnect', function(){
+                  delete follower.socketio;
+                  delete follower.anonymousattempts;
+                  delete sessionobj.name;
+                  console.log('calling __cb because disconnect');
+                  __cb();
+                });
+                sio.on('connect', function(){
+                  console.log('socket.io connected');
+                  delete follower.waitingforsockio;
+                  follower.socketio = sio;
+                });
+                sio.on('_',function(data){
+                  follower.commitOne(data);
+                });
+              }
             }
             identity.name = data.username;
             identity.realm = data.realmname;
             identity.roles = data.roles;
             Follower.username = identity.name;
             Follower.realmname = identity.realm;
-            var __cb=cb;
-            if(data.errorcode !== 'NO_SESSION' && !(follower.waitingforsockio||follower.socketio)){
-              follower.waitingforsockio=true;
-              var sio = socketFactory({ioSocket: io.connect('/?'+sessionobj.name+'='+sessionobj.value+'&username='+data.username,{
-                'reconnect':false,
-                'force new connection':true
-              })});
-              console.log('time for socket.io',sio,data);
-              sio.on('socket:error', function(reason){
-                __cb();
-              });
-              sio.on('disconnect', function(){
-                delete follower.socketio;
-                console.log('calling __cb because disconnect');
-                __cb();
-              });
-              sio.on('connect', function(){
-                console.log('socket.io connected');
-                delete follower.waitingforsockio;
-                follower.socketio = sio;
-              });
-              sio.on('_',function(data){
-                follower.commitOne(data);
-              });
+            if(identity.name){
+              //delete follower.anonymousattempts;
             }
+            var __cb=cb;
             $timeout(function(){
               data && data.data && follower.commit(data.data);
               (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
-            },1);
+            },data.session ? 1 : 10000);
           }).
           error(function(data,status,headers,config){
             console.log('error',status);
+            if(status==401){
+              delete identity.name;
+              delete identity.realm;
+              return;
+            }
             attempts++;
             if(attempts>maxattemptspertimeout){
               attempts=0;
@@ -909,7 +940,7 @@ angular.
         if(!results){return;}
         while(results.length){  
           var excb = execcb.shift();
-          //console.log(execute[0],execute[1],'=>',results[0]);
+          console.log(execute[0],execute[1],'=>',results[0]);
           var res = results.shift();
           execute.shift();
           execute.shift();
@@ -917,9 +948,8 @@ angular.
         }
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
-        }else{
-          console.log('execcb left',execute);
         }
+        console.log('execcb left',execute);
       };
       function do_execute(cb){
         if(follower.socketio){
@@ -949,7 +979,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        console.log(execute.length,execcb.length);
+        console.log(command,execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
