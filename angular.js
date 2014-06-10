@@ -561,7 +561,6 @@ Follower.prototype._subcommit = function(t){
         }
         return;
       }
-      //console.log('set',name,value);
       if(value!==null){
         var sv = this.scalars[name];
         this.scalars[name]=value;
@@ -692,7 +691,8 @@ Follower.prototype._subcommit = function(t){
 Follower.prototype.disconnect = function(){
   var s = this.socketio;
   if(s){
-    s.disconnect();
+    delete this.socketio;
+    s=null;
   }
 };
 Follower.prototype.clear = function() {
@@ -718,10 +718,12 @@ Follower.prototype.reset = function(){
   this.onReset.fire();
 };
 Follower.prototype.refollowServer = function(){
+  /*
   this.do_command(':follow',this.path);
   for(var i in this.followers){
     this.followers[i].refollowServer();
   }
+  */
 };
 Follower.prototype._purge = function () {
   this.clear();
@@ -825,7 +827,7 @@ angular.
         }
         follower.anonymousattempts=1;
       }
-      console.log(command,queryobj);
+      //console.log(command,queryobj);
       queryobj.__timestamp__ = (new Date()).getTime();
       timeout = 1;
       var worker = (function(_cb){
@@ -836,7 +838,7 @@ angular.
           }
           $http.get( url+command, {params:queryobj} ).
           success(function(data){
-            console.log(command,'=>',data);
+            //console.log(command,'=>',data);
             if(identity.name && data.username!==identity.name){
               console.log('oopsadaisy',data.username,'!==',identity.name);
               if(sessionobj.name){
@@ -873,19 +875,18 @@ angular.
                   'reconnect':false,
                   'force new connection':true
                 })});
-                console.log('time for socket.io',sio,data);
+                //console.log('time for socket.io',sio,data);
                 sio.on('socket:error', function(reason){
                   __cb();
                 });
                 sio.on('disconnect', function(){
                   delete follower.socketio;
                   delete follower.anonymousattempts;
-                  delete sessionobj.name;
                   console.log('calling __cb because disconnect');
                   __cb();
                 });
                 sio.on('connect', function(){
-                  console.log('socket.io connected');
+                  //console.log('socket.io connected');
                   delete follower.waitingforsockio;
                   follower.socketio = sio;
                 });
@@ -896,7 +897,7 @@ angular.
             }
             identity.name = data.username;
             identity.realm = data.realmname;
-            identity.roles = data.roles;
+            identity.roles = data.roles ? data.roles.split(',') : [];
             Follower.username = identity.name;
             Follower.realmname = identity.realm;
             if(identity.name){
@@ -940,7 +941,7 @@ angular.
         if(!results){return;}
         while(results.length){  
           var excb = execcb.shift();
-          console.log(execute[0],execute[1],'=>',results[0]);
+          //console.log(execute[0],execute[1],'=>',results[0]);
           var res = results.shift();
           execute.shift();
           execute.shift();
@@ -949,7 +950,7 @@ angular.
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
         }
-        console.log('execcb left',execute);
+        //console.log('execcb left',execute);
       };
       function do_execute(cb){
         if(follower.socketio){
@@ -979,7 +980,7 @@ angular.
         var shouldfire = (execute.length===0);
         execute.push(command,paramobj);
         execcb.push(cb);
-        console.log(command,execute.length,execcb.length);
+        //console.log(command,execute.length,execcb.length);
         if(shouldfire){do_execute()}
       };
 
