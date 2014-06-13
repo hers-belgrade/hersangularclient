@@ -732,7 +732,7 @@ Follower.prototype._purge = function () {
 Follower.prototype.commitOne = function(primitive){
   if(!primitive){return;}
   var path = primitive[0], target = this;
-  console.log(primitive[0],primitive[1]);
+  //console.log(primitive[0],primitive[1]);
   //console.log(JSON.stringify(primitive));
   while(target && path && path.length){
     var pe = path.shift();
@@ -848,7 +848,10 @@ angular.
                 queryobj[i] = identity[i];
               }
               sessionobj = {};
-              $timeout(_wrk,data.session?1:10000);
+              if(data.session){_wrk();}
+              else{
+                $timeout(_wrk,10000);
+              }
               return;
             }
             if(data.session){
@@ -903,11 +906,16 @@ angular.
             if(identity.name){
               //delete follower.anonymousattempts;
             }
-            var __cb=cb;
-            $timeout(function(){
+            if(data.session){
               data && data.data && follower.commit(data.data);
-              (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
-            },data.session ? 1 : 10000);
+              (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage,data.results);
+            }else{
+              var __cb=cb;
+              $timeout(function(){
+                data && data.data && follower.commit(data.data);
+                (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
+              },10000);
+            }
           }).
           error(function(data,status,headers,config){
             console.log('error',status);
