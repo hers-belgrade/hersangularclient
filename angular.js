@@ -766,11 +766,12 @@ Follower.prototype._commit = function(txns){
   }
 };
 Follower.prototype.commit = function(txns){
-  /*
   for(var i in txns){
-    console.log(this.path,txns[i][0],txns[i][1]);
+    var txn = txns[i];
+    if(txn[1] && txn[1][0]==='botcount'){
+      console.log(txn,'!!!');
+    }
   }
-  */
   if(!this.commitqueue){
     this.commitqueue = txns;
   }else{
@@ -854,6 +855,7 @@ angular.
               }
               return;
             }
+            var __cb=cb;
             if(data.session){
               for(var i in data.session){
                 if(sessionobj.name!==i){
@@ -880,13 +882,12 @@ angular.
                 })});
                 //console.log('time for socket.io',sio,data);
                 sio.on('socket:error', function(reason){
-                  __cb();
+                  (typeof __cb === 'function') && __cb();
                 });
                 sio.on('disconnect', function(){
                   delete follower.socketio;
                   delete follower.anonymousattempts;
-                  console.log('calling __cb because disconnect');
-                  __cb();
+                  (typeof __cb === 'function') && __cb();
                 });
                 sio.on('connect', function(){
                   //console.log('socket.io connected');
@@ -894,7 +895,8 @@ angular.
                   follower.socketio = sio;
                 });
                 sio.on('_',function(data){
-                  follower.commitOne(data);
+                  follower.commit(data);
+                  //follower.commitOne(data);
                 });
               }
             }
@@ -910,7 +912,6 @@ angular.
               data && data.data && follower.commit(data.data);
               (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage,data.results);
             }else{
-              var __cb=cb;
               $timeout(function(){
                 data && data.data && follower.commit(data.data);
                 (typeof __cb === 'function') && __cb(data.errorcode,data.errorparams,data.errormessage,data.results);
