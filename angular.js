@@ -732,7 +732,7 @@ Follower.prototype._purge = function () {
 Follower.prototype.commitOne = function(primitive){
   if(!primitive){return;}
   var path = primitive[0], target = this;
-  //console.log(primitive[0],primitive[1]);
+  //console.log(JSON.stringify(primitive[0]),JSON.stringify(primitive[1]));
   //console.log(JSON.stringify(primitive));
   while(target && path && path.length){
     var pe = path.shift();
@@ -766,12 +766,6 @@ Follower.prototype._commit = function(txns){
   }
 };
 Follower.prototype.commit = function(txns){
-  for(var i in txns){
-    var txn = txns[i];
-    if(txn[1] && txn[1][0]==='botcount'){
-      console.log(txn,'!!!');
-    }
-  }
   if(!this.commitqueue){
     this.commitqueue = txns;
   }else{
