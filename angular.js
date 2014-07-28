@@ -855,7 +855,7 @@ angular.
                 if(sessionobj.name!==i){
                   if(sessionobj.name){
                     sessionobj = {};
-                    console.log('time for purge');
+                    //console.log('time for purge');
                     follower._purge();
                     (typeof cb === 'function') && cb();
                     return;
@@ -879,6 +879,7 @@ angular.
                   (typeof __cb === 'function') && __cb();
                 });
                 sio.on('disconnect', function(){
+                  //console.log('socket.io disconnected');
                   delete follower.socketio;
                   delete follower.anonymousattempts;
                   (typeof __cb === 'function') && __cb();
@@ -969,7 +970,7 @@ angular.
         command_sent=true;
         var _do_ex = function(){
           transfer('!',{commands:JSON.stringify(execute.slice())},function(errcode,errparams,errmessage,results){
-            if(errcode==='NO_SESSION'){
+            if(typeof errcode === 'undefined' || errcode==='NO_SESSION'){
               sessionobj = {};
               _do_ex();
               return;
