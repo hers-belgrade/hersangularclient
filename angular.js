@@ -882,7 +882,7 @@ angular.
                   //console.log('socket.io disconnected');
                   delete follower.socketio;
                   delete follower.anonymousattempts;
-                  (typeof __cb === 'function') && __cb();
+                  (typeof __cb === 'function') && __cb('disconnected.socket.io.locally');
                 });
                 sio.on('connect', function(){
                   //console.log('socket.io connected');
@@ -970,7 +970,7 @@ angular.
         command_sent=true;
         var _do_ex = function(){
           transfer('!',{commands:JSON.stringify(execute.slice())},function(errcode,errparams,errmessage,results){
-            if(typeof errcode === 'undefined' || errcode==='NO_SESSION'){
+            if(errcode==='disconnected.socket.io.locally' || errcode==='NO_SESSION'){
               sessionobj = {};
               _do_ex();
               return;
