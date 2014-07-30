@@ -84,16 +84,13 @@ HookCollection.prototype.destruct = function(){
   }
 }
 function dummyHook(){};
-function createListener(hook,cb){
-  var hi = hook.attach(cb);
-  var ret = {destroy:function(){
-    hook.detach(hi);
-    cb = null;
-    hi = null;
-    ret.destroy = dummyHook;
-  }}
-  return ret;
-};
+function ListenerDestroyer(hook,cb){
+  this.hook = hook;
+  this.hookindex = hook.attach(cb);
+}
+ListenerDestroyer.prototype.destroy = function(){
+  this.hook.detach(this.hookindex);
+}
 function createCtxActivator(ctx,cb){
   return function(){
     cb.apply(ctx,arguments);
@@ -104,7 +101,7 @@ function CompositeHookCollection(){
   this.subhooks = {};
 };
 CompositeHookCollection.prototype.listen = function(cb){
-  return createListener(this.hook,cb);
+  return new ListenerDestroyer(this.hook,cb);
 };
 CompositeHookCollection.prototype.sublisten = function(name,cb){
   var sh = this.subhooks[name];
@@ -112,7 +109,7 @@ CompositeHookCollection.prototype.sublisten = function(name,cb){
     sh = new HookCollection();
     this.subhooks[name] = sh;
   }
-  return createListener(sh,cb);
+  return new ListenerDestroyer(sh,cb);
 };
 CompositeHookCollection.prototype.subsublisten = function(name,other,cb){
   if(!this.subsubhooks){
