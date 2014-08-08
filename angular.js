@@ -1,89 +1,4 @@
-function HookCollection(){
-  this.collection = {};
-	this.counter = 0;
-};
-HookCollection.prototype.empty = function(){
-	var c = 0;
-	for(var n in this.collection){
-		return false;
-	}
-  return true;
-};
-HookCollection.prototype.inc = function(){
-	var t = this;
-	function _inc(){
-		t.counter++;
-		if(t.counter>10000000){
-			t.counter=1;
-		}
-	};
-	_inc();
-	while(this.counter in this.collection){
-		_inc();
-	}
-};
-HookCollection.prototype.attach = function(cb){
-  if(typeof cb === 'function'){
-		this.inc();
-    this.collection[this.counter]=cb;
-    //console.log('attached',cb,'to',this.counter);
-		return this.counter;
-  }
-};
-HookCollection.prototype.detach = function(i){
-  if(!this.collection){
-    return;
-  }
-  if(!this.collection[i]){
-    console.trace();
-    console.warn('no event handler for',i);
-  }
-	delete this.collection[i];
-};
-HookCollection.prototype.fire = function(){
-  var c = this.collection;
-  var fordel=[];
-  var pa = Array.prototype.slice.call(arguments);
-  //console.log('firing on',c);
-  for(var i in c){
-    try{
-      var fqn = c[i];
-      //console.log('calling',fqn,'on',i,'with',pa);
-      fqn.apply(null,pa);
-    }
-    catch(e){
-      console.log(e);
-      console.log(e.stack);
-      fordel.unshift(i);
-    }
-  }
-  var fdl = fordel.length;
-  for(var i=0; i<fdl; i++){
-		delete c[fordel[i]];
-  }
-};
-/* controversial
-HookCollection.prototype.fireAndForget = function(){
-  var c = this.collection;
-  var pa = Array.prototype.slice.call(arguments);
-  for(var i in c){
-    try{
-      c[i].apply(null,pa);
-    }
-    catch(e){
-      console.log(e);
-      console.log(e.stack);
-    }
-  }
-	this.collection = {};
-}
-*/
-HookCollection.prototype.destruct = function(){
-  for(var i in this){
-    delete this[i];
-  }
-}
-function dummyHook(){};
+var Follower = (function(exec){
 function createListener(hook,cb){
   var hi = hook.attach(cb);
   var ret = {destroy:function(){
@@ -94,11 +9,6 @@ function createListener(hook,cb){
   }}
   return ret;
 };
-function createCtxActivator(ctx,cb){
-  return function(){
-    cb.apply(ctx,arguments);
-  }
-}
 function CompositeHookCollection(){
   this.hook = new HookCollection();
   this.subhooks = {};
@@ -433,54 +343,48 @@ Follower.prototype.unfollow = function(name){
 };
 
 Follower.prototype.listenToCollections = function(ctx,listeners){
-  for(var i in listeners){
-    listeners[i] = createCtxActivator(ctx,listeners[i]);
-  }
   var ret = new CompositeListener(this);
   ret.listenToCollections(listeners);
   return ret;
 };
+function isNullElement(el){
+  if(el===null){
+    return true;
+  }
+}
+function triggerOnMulti(cb,combo,name,val){
+  if(typeof val === 'undefined'){
+    this[name] = null;
+    return;
+  }
+  this[name] = val;
+  if(hersexecutable.traverseConditionally(this,isNullElement)){
+    return;
+  }
+  hersexecutable.call(cb,combo);
+}
 Follower.prototype.listenToMultiScalars = function(ctx,scalarnamearry,cb){
-  cb = createCtxActivator(ctx,cb);
   var ss = this.scalars;
-  function trigger(){
-    var combo = {};
-    for(var i in scalarnamearry){
-      var name = scalarnamearry[i];
-      if(typeof ss[name] === 'undefined'){
-        return;
-      }
-      combo[name] = ss[name];
-    }
-    cb(combo);
-  };
   var ret = new CompositeListener(this);
+  var combo = {};
   for(var i in scalarnamearry){
-    ret.addScalar(scalarnamearry[i],{setter:trigger});
+    combo[i] = null;
+    ret.addScalar(scalarnamearry[i],{setter:[combo,triggerOnMulti,[cb,scalarnamearry[i]]]});
   }
   return ret;
 
 };
 Follower.prototype.listenToScalars = function(ctx,listeners){
-  for(var i in listeners){
-    listeners[i] = createCtxActivator(ctx,listeners[i]);
-  }
   var ret = new CompositeListener(this);
   ret.listenToScalars(listeners);
   return ret;
 };
 Follower.prototype.listenToCollection = function(ctx,name,listeners){
-  for(var i in listeners){
-    listeners[i] = createCtxActivator(ctx,listeners[i]);
-  }
   var ret = new CompositeListener(this);
   ret.addCollection(name,listeners);
   return ret;
 };
 Follower.prototype.listenToScalar = function(ctx,name,listeners){
-  for(var i in listeners){
-    listeners[i] = createCtxActivator(ctx,listeners[i]);
-  }
   var ret = new CompositeListener(this);
   ret.addScalar(name,listeners);
   return ret;
@@ -791,6 +695,7 @@ Follower.prototype.destroy = function(){
   this.destroyed.fire();
   this.destroyed.destruct();
 };
+})(hersexecutable);
 
 angular.
   module('HERS', ['btford.socket-io']).
