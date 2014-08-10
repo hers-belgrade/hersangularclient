@@ -1,28 +1,25 @@
 var Follower = (function(exec){
-function createListener(hook,cb){
-  var hi = hook.attach(cb);
-  var ret = {destroy:function(){
-    hook.detach(hi);
-    cb = null;
-    hi = null;
-    ret.destroy = dummyHook;
-  }}
-  return ret;
-};
+function ListenerDestroyer(hook,cb){
+  this.hook = hook;
+  this.hookindex = hook.attach(cb);
+}
+ListenerDestroyer.prototype.destroy = function(){
+  this.hook.detach(this.hookindex);
+}
 function CompositeHookCollection(){
-  this.hook = new HookCollection();
+  this.hook = new exec.HookCollection();
   this.subhooks = {};
 };
 CompositeHookCollection.prototype.listen = function(cb){
-  return createListener(this.hook,cb);
+  return new ListenerDestroyer(this.hook,cb);
 };
 CompositeHookCollection.prototype.sublisten = function(name,cb){
   var sh = this.subhooks[name];
   if(!sh){
-    sh = new HookCollection();
+    sh = new exec.HookCollection();
     this.subhooks[name] = sh;
   }
-  return createListener(sh,cb);
+  return new ListenerDestroyer(sh,cb);
 };
 CompositeHookCollection.prototype.subsublisten = function(name,other,cb){
   if(!this.subsubhooks){
@@ -30,10 +27,10 @@ CompositeHookCollection.prototype.subsublisten = function(name,other,cb){
   }
   var ssh = this.subsubhooks[name+'|'+other];
   if(!ssh){
-    ssh = new HookCollection();
+    ssh = new exec.HookCollection();
     this.subsubhooks[name+'|'+other] = ssh;
   }
-  return createListener(ssh,cb);
+  return new ListenerDestroyer(ssh,cb);
 };
 CompositeHookCollection.prototype.fire = function(){
   var args = Array.prototype.slice.call(arguments);
@@ -352,24 +349,22 @@ function isNullElement(el){
     return true;
   }
 }
-function triggerOnMulti(cb,combo,name,val){
+function multiTrigger(cb,name,val){
   if(typeof val === 'undefined'){
     this[name] = null;
-    return;
+    return
   }
   this[name] = val;
-  if(hersexecutable.traverseConditionally(this,isNullElement)){
+  if(exec.traverseConditionally(this,isNullElement)){
     return;
   }
-  hersexecutable.call(cb,combo);
+  exec.call(cb,this);
 }
 Follower.prototype.listenToMultiScalars = function(ctx,scalarnamearry,cb){
-  var ss = this.scalars;
-  var ret = new CompositeListener(this);
-  var combo = {};
+  var ret = new CompositeListener(this),combo = {};
   for(var i in scalarnamearry){
     combo[i] = null;
-    ret.addScalar(scalarnamearry[i],{setter:[combo,triggerOnMulti,[cb,scalarnamearry[i]]]});
+    ret.addScalar(scalarnamearry[i],{setter:[combo,multiTrigger,[cb,scalarnamearry[i]]]});
   }
   return ret;
 
@@ -389,21 +384,19 @@ Follower.prototype.listenToScalar = function(ctx,name,listeners){
   ret.addScalar(name,listeners);
   return ret;
 };
+function jsonProcess(val,oldval){
+  val = ('undefined' !== typeof(val) && val.length) ? JSON.parse(val) : undefined;
+  oldval = ('undefined' !== typeof(oldval) && oldval.length) ? JSON.parse(oldval) : undefined;
+  exec.apply(this,[val,oldval]);
+}
 Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 	if (listeners.setter) {
 		var cb = listeners.setter;
-		listeners.setter = function (v, ov) {
-      v = ('undefined' !== typeof(v) && v.length) ? JSON.parse(v) : undefined;
-      ov = ('undefined' !== typeof(ov) && ov.length) ? JSON.parse(ov) : undefined;
-			cb.call(this, v, ov);
-		}
+		listeners.setter = [cb,jsonProcess];
 	}
 	return this.listenToScalar(ctx, name, listeners);
 };
 Follower.prototype.listenToUsers = function(ctx,listeners){
-  for(var i in listeners){
-    listeners[i] = createCtxActivator(ctx,listeners[i]);
-  }
   var ret = new CompositeListener(this);
   ret.listenToUsers(listeners);
   return ret;
@@ -695,6 +688,7 @@ Follower.prototype.destroy = function(){
   this.destroyed.fire();
   this.destroyed.destruct();
 };
+return Follower;
 })(hersexecutable);
 
 angular.
