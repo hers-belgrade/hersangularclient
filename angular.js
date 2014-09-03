@@ -21,17 +21,6 @@ CompositeHookCollection.prototype.sublisten = function(name,cb){
   }
   return new ListenerDestroyer(sh,cb);
 };
-CompositeHookCollection.prototype.subsublisten = function(name,other,cb){
-  if(!this.subsubhooks){
-    this.subsubhooks = {};
-  }
-  var ssh = this.subsubhooks[name+'|'+other];
-  if(!ssh){
-    ssh = new exec.HookCollection();
-    this.subsubhooks[name+'|'+other] = ssh;
-  }
-  return new ListenerDestroyer(ssh,cb);
-};
 CompositeHookCollection.prototype.fire = function(){
   var args = Array.prototype.slice.call(arguments);
   this.hook.fire.apply(this.hook,args);
@@ -42,15 +31,6 @@ CompositeHookCollection.prototype.fire = function(){
       sh.fire.apply(sh,args);
     }
   }
-  if(this.subsubhooks){
-    var other = args.shift();
-    if(other){
-      var ssh = this.subsubhooks[name+'|'+other];
-      if(ssh){
-        ssh.fire.apply(ssh,args);
-      }
-    }
-  }
 };
 CompositeHookCollection.prototype.destruct = function(){
   this.hook.destruct();
@@ -58,12 +38,6 @@ CompositeHookCollection.prototype.destruct = function(){
     this.subhooks[i].destruct();
   }
   delete this.subhooks;
-  if(this.subsubhooks){
-    for(var i in this.subsubhooks){
-      this.subsubhooks[i].destruct();
-    }
-    delete this.subsubhooks;
-  }
 };
 
 function CompositeListener(follower){
@@ -90,14 +64,14 @@ CompositeListener.prototype.listenToScalars = function(listenerpack){
   if(la){
     sl.a = this.follower.newScalar.listen(la);
     for(var i in ss){
-      la(i);
+      exec.call(la,i);
     }
   }
   var ls = listenerpack.setter;
   if(ls){
     sl.s = this.follower.scalarChanged.listen(ls);
     for(var i in ss){
-      ls(i,ss[i]);
+      exec.apply(ls,[i,ss[i]]);
     }
   }
   var ld = listenerpack.deactivator;
@@ -112,51 +86,22 @@ CompositeListener.prototype.addScalar = function(scalarname,listenerpack){
   if(la){
     sl.a = this.follower.newScalar.sublisten(scalarname,la);
     if(typeof sv !== 'undefined'){
-      la();
+      exec.run(la);
     }
   }
   var ls = listenerpack.setter;
   if(ls){
     sl.s = this.follower.scalarChanged.sublisten(scalarname,ls);
     if(typeof sv !== 'undefined'){
-      ls(sv);
+      exec.call(ls,sv);
     }
   }
   var ld = listenerpack.deactivator;
   if(ld){
     sl.d = this.follower.scalarRemoved.sublisten(scalarname,ld);
-  }
-};
-CompositeListener.prototype.listenToUsers = function(listenerpack){
-  var sl = this._getClearListener('/users/');
-  var la = listenerpack.activator;
-  if(la){
-    sl.a = this.follower.newUser.listen(la);
-    for(var _r in this.follower.realms){
-      var r = this.follower.realms[_r];
-      for(var _un in r){
-        la(_un,_r);
-      }
+    if(typeof sv === 'undefined'){
+      exec.run(ld);
     }
-  }
-  var ld = listenerpack.deactivator;
-  if(ld){
-    sl.d = this.follower.userRemoved.listen(ld);
-  }
-};
-CompositeListener.prototype.addUser = function(username,realmname,listenerpack){
-  var sl = this._getClearListener(collectionname);
-  var la = listenerpack.activator;
-  if(la){
-    sl.a = this.follower.newCollection.subsublisten(username,realmname,la);
-    var r = this.follower.realms[realmname];
-    if(typeof r !== 'undefined' && r.indexOf(username) >= 0){
-      la();
-    }
-  }
-  var ld = listenerpack.deactivator;
-  if(ld){
-    sl.d = this.follower.userRemoved.subsublisten(username,realmname,ld);
   }
 };
 CompositeListener.prototype.listenToCollections = function(listenerpack){
@@ -165,7 +110,7 @@ CompositeListener.prototype.listenToCollections = function(listenerpack){
   if(la){
     sl.a = this.follower.newCollection.listen(la);
     for(var i in this.follower.collections){
-      la(i);
+      exec.call(la,i);
     }
   }
   var ld = listenerpack.deactivator;
@@ -176,43 +121,48 @@ CompositeListener.prototype.listenToCollections = function(listenerpack){
 CompositeListener.prototype.addCollection = function(collectionname,listenerpack){
   var sl = this._getClearListener(collectionname);
   var la = listenerpack.activator;
+  var collectiondefined = typeof this.follower.collections[collectionname] !== 'undefined';
   if(la){
     sl.a = this.follower.newCollection.sublisten(collectionname,la);
-    if(typeof this.follower.collections[collectionname] !== 'undefined'){
-      la();
+    if(collectiondefined){
+      exec.call(la);
     }
   }
   var ld = listenerpack.deactivator;
   if(ld){
     sl.d = this.follower.collectionRemoved.sublisten(collectionname,ld);
+    if(!collectiondefined){
+      exec.run(ld);
+    }
   }
 };
-CompositeListener.prototype.destroy = function(){
-  delete this.follower;
-  for(var i in this.listeners){
-    var l = this.listeners[i];
-    if(typeof l.destroy === 'function'){
-      l.destroy();
-    }
-    for(var i in l){
-      var _l = l[i];
-      if(typeof _l.destroy === 'function'){
-        _l.destroy();
-      }
-      delete l[i];
-    }
-    delete this.listeners[i];
+function destroyListenerChild(l){
+  for(var i in l){
+    l[i].destroy();
   }
-  delete this.listeners;
+}
+CompositeListener.prototype.destroy = function(){
+  this.follower = null;
+  exec.traverse(this.listeners,destroyListenerChild);
+  this.listeners = null;
 };
 
 function Follower(commander){
-  if(!commander){
-    return;
+  this.commander = null;
+  this.scalars = {};
+  this.collections = {};
+  this.newScalar = new CompositeHookCollection();
+  this.scalarChanged = new CompositeHookCollection();
+  this.scalarRemoved = new CompositeHookCollection();
+  this.newCollection = new CompositeHookCollection();
+  this.collectionRemoved = new CompositeHookCollection();
+  this.onReset = new CompositeHookCollection();
+  this.destroyed = new CompositeHookCollection();
+  this.followers={};
+  if(commander){
+    this.setCommander(commander);
   }
-  this.setCommander(commander);
 };
-
 Follower.prototype.getPath = function () {
   var ret = '';
   for (var i in this.path) {
@@ -226,15 +176,8 @@ Follower.prototype.getPath = function () {
   }
   return ret;
 };
-
-
-Follower.prototype.do_command = function(command,paramobj,statuscb,ctx){
-  if(ctx&&!statuscb){
-    throw "got ctx and no cb?";
-  }
-  (typeof this.commander === 'function') && this.commander(command,paramobj,ctx?function(){
-    statuscb.apply(ctx,arguments);
-  }:statuscb);
+Follower.prototype.do_command = function(command,paramobj,cb){
+  exec.apply(this.commander,[command,paramobj,cb]);
 };
 Follower.prototype.username = function(){
   return Follower.username;
@@ -249,24 +192,9 @@ Follower.prototype.full_username = function () {
 }
 
 Follower.prototype.setCommander = function(fn){
-  this.commander = fn;
-  this.scalars = {};
-  this.collections = {};
-  this.realms = {};
-  this.txnBegins = new CompositeHookCollection();
-  this.txnEnds = new CompositeHookCollection();
-  this.newScalar = new CompositeHookCollection();
-  this.scalarChanged = new CompositeHookCollection();
-  this.scalarRemoved = new CompositeHookCollection();
-  this.newCollection = new CompositeHookCollection();
-  this.collectionRemoved = new CompositeHookCollection();
-  this.newRealm = new CompositeHookCollection();
-  this.newUser = new CompositeHookCollection();
-  this.realmRemoved = new CompositeHookCollection();
-  this.userRemoved = new CompositeHookCollection();
-  this.onReset = new CompositeHookCollection();
-  this.destroyed = new CompositeHookCollection();
-  this.followers={};
+  if(exec.isA(fn)){
+    this.commander = fn;
+  }
 };
 Follower.prototype.deleteScalar = function(scalarname){
   if(typeof this.scalars[scalarname] !== 'undefined'){
@@ -287,52 +215,42 @@ Follower.prototype.deleteCollection = function(collectionname){
     delete this.collections[collectionname];
   }
 };
-Follower.prototype.pathOf = function(pathelem,passthru){
-  //var pe = passthru ? [[pathelem,true]] : [pathelem];
-  var pe = [pathelem];
-  if(this.path){
-    return typeof pathelem === 'undefined' ? this.path : this.path.concat(pe);
-  }else{
-    return typeof pathelem === 'undefined' ? [] : pe ;
-  }
+Follower.prototype.pathOf = function(pathelem){
+  var p = this.path || [];
+  return typeof pathelem === 'undefined' ? p : p.concat([pathelem]);
 };
-Follower.prototype.childFollower = function(name,passthru){
+function sendCommand(name,command,paramobj,statuscb){
+  var fc = command.charAt(0);
+  if(fc!=='/' && fc!==':'){
+    command = name+'/'+command;
+  }
+  this.do_command(command,paramobj,statuscb);
+}
+Follower.prototype.childFollower = function(name){
   var f = this.followers[name];
   if(f){
     return f;
   }
   var t = this;
-  f = new Follower(function(command,paramobj,statuscb){
-    var fc = command.charAt(0);
-    if(fc!=='/' && fc!==':'){
-      command = name+'/'+command;
-    }
-    t.do_command(command,paramobj,statuscb);
-  });
-  var fp = this.pathOf(name,passthru);
+  f = new Follower([this,sendCommand,[name]]);
+  var fp = this.pathOf(name);
   f.path = fp;
   this.followers[name] = f;
-  f.destroyed.listen(function(){
-    delete t.followers[name];
-  });
+  f.destroyed.listen([this,this.onChildDestroyed,[name]]);
   return f;
 };
-Follower.prototype.follow = function(name,passthru){
+Follower.prototype.onChildDestroyed = function(name){
+  delete this.followers[name];
+};
+Follower.prototype.follow = function(name){
   if(typeof name === 'undefined'){
     return this;
   }
   if(this.followers[name]){
     return this.followers[name];
   }
-  var f = this.childFollower(name,passthru);
-  /*
-  this.do_command(':follow',f.path,function(errcb){
-    if((errcb==='OK') && (typeof this.collections[name] === 'undefined')){
-      this.collections[name] = null;
-      this.newCollection.fire(name);
-    }
-  },this);
-  */
+  var f = this.childFollower(name);
+  //this.do_command(':follow',f.path);
   return f;
 };
 Follower.prototype.unfollow = function(name){
@@ -352,7 +270,7 @@ function isNullElement(el){
 function multiTrigger(cb,name,val){
   if(typeof val === 'undefined'){
     this[name] = null;
-    return
+    return;
   }
   this[name] = val;
   if(exec.traverseConditionally(this,isNullElement)){
@@ -363,7 +281,9 @@ function multiTrigger(cb,name,val){
 Follower.prototype.listenToMultiScalars = function(ctx,scalarnamearry,cb){
   var ret = new CompositeListener(this),combo = {};
   for(var i in scalarnamearry){
-    combo[i] = null;
+    combo[scalarnamearry[i]] = null;
+  }
+  for(var i in scalarnamearry){
     ret.addScalar(scalarnamearry[i],{setter:[combo,multiTrigger,[cb,scalarnamearry[i]]]});
   }
   return ret;
@@ -396,40 +316,8 @@ Follower.prototype.listenToJSONScalar = function (ctx, name, listeners) {
 	}
 	return this.listenToScalar(ctx, name, listeners);
 };
-Follower.prototype.listenToUsers = function(ctx,listeners){
-  var ret = new CompositeListener(this);
-  ret.listenToUsers(listeners);
-  return ret;
-};
 Follower.prototype.follower = function(name){
   return this.followers[name];
-};
-Follower.prototype.performUserOp = function(userop){
-  var op = userop[0], un = userop[1], rn = userop[2];
-  switch(userop[0]){
-    case 1:
-      if(!this.realms[rn]){
-        this.realms[rn] = [un];
-        this.newRealm.fire(rn);
-      }else{
-        this.realms[rn].push(un);
-        this.newUser.fire(un,rn);
-      }
-      break;
-    case 2:
-      if(this.realms[rn]){
-        var ui = this.realms[rn].indexOf(un);
-        if(ui>=0){
-          this.userRemoved.fire(un,rn);
-          this.realms[rn].splice(ui,1);
-          if(!this.realms[rn].length){
-            this.realmRemoved.fire(rn);
-            delete this.realms[rn];
-          }
-        }
-      }
-      break;
-  }
 };
 Follower.prototype._subcommit = function(t){
   if(!(t&&t.length)){return;}
@@ -448,16 +336,6 @@ Follower.prototype._subcommit = function(t){
   //console.log(this.path,name,value);
   switch(t.length){
     case 2:
-      if(name===null){
-        if(this.txnalias){
-          this.txnEnds.fire(value);
-          delete this.txnalias;
-        }else{
-          this.txnalias = value;
-          this.txnBegins.fire(value);
-        }
-        return;
-      }
       if(value!==null){
         var sv = this.scalars[name];
         this.scalars[name]=value;
@@ -495,102 +373,10 @@ Follower.prototype._subcommit = function(t){
       this.deleteCollection(name);
     break;
   }
-  return;
-  var txnpack = txns[0],txnps = txnpack&&txnpack.length>0?txnpack[0]:[], userops = txnpack&&txnpack.length>1?txnpack[1]:[], chldtxns=txns[1];
-  //console.log(this.path?this.path.join('.'):'.','should commit',txnalias,txnps);
-  for(var i in userops){
-    this.performUserOp(userops[i]);
-  }
-  this.txnBegins.fire(txnalias);
-  for(var j in txnps){
-    var t = txnps[j],name=t[0],value=t[1],sv=this.scalars[name],c=this.collections[name];
-    switch(t.length){
-      case 2:
-        //console.log('set',name,value);
-        if(value!==null){
-          this.scalars[name]=value;
-          if(typeof sv === 'undefined'){
-            this.newScalar.fire(name,value);
-						this.scalarChanged.fire(name,value,sv);
-          }else{
-						(sv != value) && this.scalarChanged.fire(name,value,sv);
-					}
-          
-        }else{
-          if(typeof this.collections[name] !== 'undefined'){
-            //throw 'already have '+name+' collection';
-            //don't panic, it may be the 'init'
-            break;
-          }
-          this.collections[name]=null;
-          //console.log('new collection',name);
-          /*
-          if(this.followers[name]){
-            this.followers[name];//??
-          }
-          */
-          this.newCollection.fire(name);
-        }
-      break;
-      case 1:
-        //console.log('delete',name);
-        this.deleteScalar(name);
-        this.deleteCollection(name);
-      break;
-    }
-  }
-  if(txnalias==='init'){
-    //look for all mentioned elements to set
-    var allinit = {};
-    for(var i in txnps){
-      if(txnps[i].length===2){
-        allinit[txnps[i][0]] = 1;
-      }
-    }
-    for(var i in this.scalars){
-      if(!(i in allinit)){
-        this.deleteScalar(i);
-      }
-    }
-    for(var i in this.collections){
-      if(!(i in allinit)){
-        this.deleteCollection(i);
-      }
-    }
-		this.init_done = true;
-
-		/*
-    //now, re-awake all the needed followers
-    for(var i in this.followers){
-      //console.log('awaking follower',i);
-      this.do_command('/follow',{path:this.followers[i].path});
-    }
-		*/
-  }
-  this.txnEnds.fire(txnalias);
-  for(var i in chldtxns){
-    var chldtxn=chldtxns[i];
-    //console.log('child',i,chldtxn);
-    this.childFollower(i)._subcommit(txnalias,chldtxn);
-  }
-	/*
-  if(txnalias==='init'){
-    for(var i in this.followers){
-      if(!i in allinit){
-        this.followers[i]._subcommit(txnalias,[]);
-      }
-    }
-  }
-	*/
-  //console.log(this.path?this.path.join('.'):'.','finally',this.scalars,this.collections);
 };
 
 Follower.prototype.disconnect = function(){
-  var s = this.socketio;
-  if(s){
-    delete this.socketio;
-    s=null;
-  }
+  this.socketio = null;
 };
 Follower.prototype.clear = function() {
   for(var i in this.followers){
@@ -598,7 +384,6 @@ Follower.prototype.clear = function() {
   }
   for(var i in this.scalars){
     this.deleteScalar(i);
-    //this.deleteCollection(i);
   }
   for (var i in this.collections) {
     this.deleteCollection(i);
@@ -642,7 +427,6 @@ Follower.prototype.commitOne = function(primitive){
   if(target){
     target._subcommit(primitive[1]);
   }
-  //if(txnalias==='init') this._purge();
 };
 Follower.prototype.parseAndCommit = function(txnstr){
   var txn = JSON.parse(txnstr);
@@ -673,17 +457,11 @@ Follower.prototype.commit = function(txns){
 Follower.prototype.dump = function(){
 };
 Follower.prototype.destroy = function(){
-  this.txnBegins.destruct();
-  this.txnEnds.destruct();
   this.newScalar.destruct();
   this.scalarChanged.destruct();
   this.scalarRemoved.destruct();
   this.newCollection.destruct();
   this.collectionRemoved.destruct();
-  this.newRealm.destruct();
-  this.newUser.destruct();
-  this.realmRemoved.destruct();
-  this.userRemoved.destruct();
   this.onReset.destruct();
   this.destroyed.fire();
   this.destroyed.destruct();
@@ -912,10 +690,3 @@ function ConsumerCtrl($scope,follower){
     this.consumercount=val;
   }});
 };
-function DataSnifferCtrl($scope,follower){
-  $scope.dataDump = '';
-  follower.txnEnds.attach(function(){
-    $scope.dataDump = follower.dump();
-  });
-};
-
