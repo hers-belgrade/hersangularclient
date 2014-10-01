@@ -5,6 +5,8 @@ function ListenerDestroyer(hook,cb){
 }
 ListenerDestroyer.prototype.destroy = function(){
   this.hook.detach(this.hookindex);
+  this.hook = null;
+  this.hookindex = null;
 }
 function CompositeHookCollection(){
   this.hook = new exec.HookCollection();
@@ -36,8 +38,10 @@ CompositeHookCollection.prototype.destruct = function(){
   this.hook.destruct();
   for(var i in this.subhooks){
     this.subhooks[i].destruct();
+    delete this.subhooks[i];
   }
-  delete this.subhooks;
+  this.subhooks = null;
+  this.hook = null;
 };
 
 function CompositeListener(follower){
@@ -64,14 +68,16 @@ CompositeListener.prototype.listenToScalars = function(listenerpack){
   if(la){
     sl.a = this.follower.newScalar.listen(la);
     for(var i in ss){
-      exec.call(la,i);
+      exec.applyNext([exec,exec.call],[la,i]);
+      //exec.call(la,i);
     }
   }
   var ls = listenerpack.setter;
   if(ls){
     sl.s = this.follower.scalarChanged.listen(ls);
     for(var i in ss){
-      exec.apply(ls,[i,ss[i]]);
+      exec.applyNext([exec,exec.apply],[ls,[i,ss[i]]]);
+      //exec.apply(ls,[i,ss[i]]);
     }
   }
   var ld = listenerpack.deactivator;
@@ -86,21 +92,24 @@ CompositeListener.prototype.addScalar = function(scalarname,listenerpack){
   if(la){
     sl.a = this.follower.newScalar.sublisten(scalarname,la);
     if(typeof sv !== 'undefined'){
-      exec.run(la);
+      exec.callNext([exec,exec.run],la);
+      //exec.run(la);
     }
   }
   var ls = listenerpack.setter;
   if(ls){
     sl.s = this.follower.scalarChanged.sublisten(scalarname,ls);
     if(typeof sv !== 'undefined'){
-      exec.call(ls,sv);
+      exec.applyNext([exec,exec.call],[ls,sv]);
+      //exec.call(ls,sv);
     }
   }
   var ld = listenerpack.deactivator;
   if(ld){
     sl.d = this.follower.scalarRemoved.sublisten(scalarname,ld);
     if(typeof sv === 'undefined'){
-      exec.run(ld);
+      exec.callNext([exec,exec.run],ld);
+      //exec.run(ld);
     }
   }
 };
@@ -110,7 +119,8 @@ CompositeListener.prototype.listenToCollections = function(listenerpack){
   if(la){
     sl.a = this.follower.newCollection.listen(la);
     for(var i in this.follower.collections){
-      exec.call(la,i);
+      exec.applyNext([exec,exec.call],[la,i]);
+      //exec.call(la,i);
     }
   }
   var ld = listenerpack.deactivator;
@@ -125,25 +135,29 @@ CompositeListener.prototype.addCollection = function(collectionname,listenerpack
   if(la){
     sl.a = this.follower.newCollection.sublisten(collectionname,la);
     if(collectiondefined){
-      exec.call(la);
+      exec.callNext([exec,exec.run],la);
+      //exec.run(la);
     }
   }
   var ld = listenerpack.deactivator;
   if(ld){
     sl.d = this.follower.collectionRemoved.sublisten(collectionname,ld);
     if(!collectiondefined){
-      exec.run(ld);
+      exec.callNext([exec,exec.run],ld);
+      //exec.run(ld);
     }
   }
 };
-function destroyListenerChild(l){
+function destroyListenerChild(l,li){
   for(var i in l){
     l[i].destroy();
+    l[i] = null;
   }
+  delete this[li];
 }
 CompositeListener.prototype.destroy = function(){
   this.follower = null;
-  exec.traverse(this.listeners,destroyListenerChild);
+  exec.traverse(this.listeners,[this.listeners,destroyListenerChild]);
   this.listeners = null;
 };
 
@@ -244,6 +258,9 @@ Follower.prototype.onChildDestroyed = function(name){
 };
 Follower.prototype.follow = function(name){
   if(typeof name === 'undefined'){
+    return this;
+  }
+  if(typeof name === 'string' && !name.length){
     return this;
   }
   if(this.followers[name]){
@@ -392,9 +409,9 @@ Follower.prototype.clear = function() {
 Follower.prototype.reset = function(){
   for(var i in this.followers){
     this.followers[i].reset();
-    this.followers[i].destroy();
+    //this.followers[i].destroy();
     //console.log(this.path,'destroying',i);
-    delete this.followers[i];
+    //delete this.followers[i];
   }
   this.clear();
   this.onReset.fire();
@@ -414,7 +431,7 @@ Follower.prototype._purge = function () {
 Follower.prototype.commitOne = function(primitive){
   if(!primitive){return;}
   var path = primitive[0], target = this;
-  //console.log(JSON.stringify(primitive[0]),JSON.stringify(primitive[1]));
+  console.log(JSON.stringify(primitive[0]),JSON.stringify(primitive[1]));
   //console.log(JSON.stringify(primitive));
   while(target && path && path.length){
     var pe = path.shift();
@@ -625,7 +642,10 @@ angular.
           var res = results.shift();
           execute.shift();
           execute.shift();
-          excb && excb.apply(null,res);
+          //excb && excb.apply(null,res);
+          if(hersexecutable.isA(excb)){
+            hersexecutable.apply(excb,res);
+          }
         }
         if(execute.length && (execute.length == execcb.length*2)){ //new pack
           do_execute();
