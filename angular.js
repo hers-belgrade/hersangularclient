@@ -678,8 +678,6 @@ angular.
     };
     C.prototype.do_results = function(results){
       if(!results){return;}
-      results = results.results;
-      if(!results){return;}
       while(results.length){  
         var excb = this.execcb.shift();
         //console.log(execute[0],execute[1],'=>',results[0]);
