@@ -699,7 +699,7 @@ angular.
         SocketIOManager.socket.emit('!',this.execute.slice());
         return;
       }
-      TransferManager.send('!',{commands:JSON.stringify(execute.slice())},this.onResults.bind(this));
+      TransferManager.send('!',{commands:JSON.stringify(this.execute.slice())},this.onResults.bind(this));
     };
     C.prototype.onResults = function(errcode,errparams,errmessage,results){
       if(errcode==='NO_SESSION'){
