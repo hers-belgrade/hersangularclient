@@ -508,7 +508,8 @@ angular.
       if(retcommand.charAt(0)!=='/'){
         retcommand = '/'+retcommand;
       }
-      retcommand = url+retcommand;
+      ///url??
+      //retcommand = url+retcommand;
       return [retcommand,{params:retobj}];
     };
   }]).
@@ -569,7 +570,7 @@ angular.
     };
     return new SM();
   }]).
-  factory('TransferManager',['$http','$timeout','identity','sessionobj','SocketIOManager','follower',function($http,$timeout,identity,sessionobj,SocketIOManager,follower){
+  factory('TransferManager',['$http','$timeout','identity','sessionobj','SocketIOManager','follower', 'makeupQuery' ,function($http,$timeout,identity,sessionobj,SocketIOManager,follower, makeupQuery){
     function TM(){
       this.maxattemptspertimeout = 5;
       this.attempts = 0;
@@ -582,7 +583,7 @@ angular.
       this.sockDisconnectionWaiter = null;
     };
     TM.prototype.send = function(command,queryobj,cb,withreconnection){
-      $http.get(command,queryobj).success(this.onSuccess.bind(this,cb)).error(this.onError.bind(this,withreconnection));
+      $http.get.apply($http,makeupQuery(command, queryobj)).success(this.onSuccess.bind(this,cb)).error(this.onError.bind(this,withreconnection));
     };
     TM.prototype.go = function(){
       if(SocketIOManager.ready){
