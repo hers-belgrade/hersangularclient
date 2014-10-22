@@ -3,8 +3,8 @@ angular.
   module('HERS', ['btford.socket-io']).
   value('sessionobj',{}).
   value('identity',{}).
-  factory('Follower',['identity',function(){
-    return (function(exec){
+  factory('Follower',['identity',function(identity){
+    return (function(exec,identity){
     function ListenerDestroyer(hook,cb){
       this.hook = hook;
       this.hookindex = hook.attach(cb);
@@ -490,7 +490,7 @@ angular.
       this.destroyed.destruct();
     };
     return Follower;
-    })(hersexecutable);
+    })(hersexecutable,identity);
   }]).
   factory('follower',['Follower',function(Follower){
     return new Follower();
