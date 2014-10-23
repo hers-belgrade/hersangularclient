@@ -681,7 +681,7 @@ angular.
     };
     return new TM();
   }]).
-  factory('commander',['SocketIOManager','TransferManager',function(SocketIOManager,TransferManager){
+  factory('commander',['SocketIOManager','TransferManager', '$timeout',function(SocketIOManager,TransferManager, $timeout){
     function C(){
       this.sent = false;
       this.execute = [];
