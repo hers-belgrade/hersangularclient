@@ -577,6 +577,7 @@ angular.
       this.timeout = 1;
       this.maxtimeout = 3;
       this.sockDisconnectionWaiter = SocketIOManager.disconnected.attach(this.go.bind(this));
+      this.identity_changed_cb = null;
     }
     TM.prototype.destroy = function(){
       SocketIOManager.disconnected.detach(this.sockDisconnectionWaiter);
@@ -594,7 +595,8 @@ angular.
       $http.get.apply($http,mq).success(this.onSuccess.bind(this,cb)).error(this.onError.bind(this,withreconnection));
       return true;
     };
-    TM.prototype.go = function(){
+    TM.prototype.go = function(identity_changed_cb){
+      this.identity_changed_cb = identity_changed_cb;
       if(SocketIOManager.ready){
         return;
       }
@@ -620,6 +622,8 @@ angular.
       identity.realm = data.realmname;
       identity.roles = data.roles ? data.roles.split(',') : [];
 
+      
+
       if(data.session){
         for(var i in data.session){
           if(sessionobj.name!==i){
@@ -642,6 +646,11 @@ angular.
         }
         SocketIOManager.init();
         data && data.data && follower.commit(data.data);
+
+        if ('function' === typeof(this.identity_changed_cb)) {
+          this.identity_changed_cb({identity:identity, sessionobj:sessionobj});
+        }
+
         (typeof cb === 'function') && cb(data.errorcode,data.errorparams,data.errormessage,data.results);
       }else{
         $timeout(function(){
@@ -736,9 +745,9 @@ angular.
     return c.do_command.bind(c);
   }]).
   factory('go',function(follower,TransferManager,commander){
-    return function(){
+    return function(identity_changed_cb){
       follower.setCommander(commander);
-      TransferManager.go();
+      TransferManager.go(identity_changed_cb);
     };
   });
 
