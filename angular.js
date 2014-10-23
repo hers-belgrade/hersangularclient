@@ -581,9 +581,18 @@ angular.
     TM.prototype.destroy = function(){
       SocketIOManager.disconnected.detach(this.sockDisconnectionWaiter);
       this.sockDisconnectionWaiter = null;
+      this.maxtimeout = null;
+      this.timeout = null;
+      this.attempts = null;
+      this.maxattemptspertimeout = null;
     };
     TM.prototype.send = function(command,queryobj,cb,withreconnection){
-      $http.get.apply($http,makeupQuery(command, queryobj)).success(this.onSuccess.bind(this,cb)).error(this.onError.bind(this,withreconnection));
+      var mq = makeupQuery(command,queryobj);
+      if(!(mq && mq[1] && mq[1].params && mq[1].params.name) && command !== '_'){
+        return false;
+      }
+      $http.get.apply($http,mq).success(this.onSuccess.bind(this,cb)).error(this.onError.bind(this,withreconnection));
+      return true;
     };
     TM.prototype.go = function(){
       if(SocketIOManager.ready){
@@ -700,7 +709,9 @@ angular.
         SocketIOManager.socket.emit('!',this.execute.slice());
         return;
       }
-      TransferManager.send('!',{commands:JSON.stringify(this.execute.slice())},this.onResults.bind(this));
+      if(!TransferManager.send('!',{commands:JSON.stringify(this.execute.slice())},this.onResults.bind(this))){
+        $timeout(this.do_execute.bind(this),1000);
+      }
     };
     C.prototype.onResults = function(errcode,errparams,errmessage,results){
       if(errcode==='NO_SESSION'){
