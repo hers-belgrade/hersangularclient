@@ -218,13 +218,14 @@ angular.
     };
     Follower.prototype.deleteScalar = function(scalarname){
       if(typeof this.scalars[scalarname] !== 'undefined'){
+        delete this.scalars[scalarname];
         this.scalarChanged.fire(scalarname,undefined,this.scalars[scalarname]);
         this.scalarRemoved.fire(scalarname);
-        delete this.scalars[scalarname];
       }
     };
     Follower.prototype.deleteCollection = function(collectionname){
       if(typeof this.collections[collectionname] !== 'undefined'){
+        delete this.collections[collectionname];
         this.collectionRemoved.fire(collectionname);
         /* leave the follower
         if(this.followers[collectionname]){
@@ -232,7 +233,6 @@ angular.
           delete this.followers[collectionname];
         }
         */
-        delete this.collections[collectionname];
       }
     };
     Follower.prototype.pathOf = function(pathelem){
@@ -437,7 +437,7 @@ angular.
     Follower.prototype.commitOne = function(primitive){
       if(!primitive){return;}
       var path = primitive[0], target = this;
-      console.log(JSON.stringify(primitive[0]),JSON.stringify(primitive[1]));
+      //console.log(JSON.stringify(primitive[0]),JSON.stringify(primitive[1]));
       //console.log(JSON.stringify(primitive));
       while(target && path && path.length){
         var pe = path.shift();
