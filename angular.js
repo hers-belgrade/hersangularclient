@@ -67,23 +67,26 @@ angular.
       }
       return sl;
     };
-    CompositeListener.prototype.listenToScalars = function(listenerpack){
+    CompositeListener.prototype.listenToScalarsForReal = function(listenerpack){
+      if(this.listeners===null){
+        return;
+      }
       var sl = this._getClearListener('/scalars/');
       var la = listenerpack.activator;
       var ss = this.follower.scalars;
       if(la){
         sl.a = this.follower.newScalar.listen(la);
         for(var i in ss){
-          exec.applyNext([exec,exec.call],[la,i]);
-          //exec.call(la,i);
+          //exec.applyNext([exec,exec.call],[la,i]);
+          exec.call(la,i);
         }
       }
       var ls = listenerpack.setter;
       if(ls){
         sl.s = this.follower.scalarChanged.listen(ls);
         for(var i in ss){
-          exec.applyNext([exec,exec.apply],[ls,[i,ss[i]]]);
-          //exec.apply(ls,[i,ss[i]]);
+          //exec.applyNext([exec,exec.apply],[ls,[i,ss[i]]]);
+          exec.apply(ls,[i,ss[i]]);
         }
       }
       var ld = listenerpack.deactivator;
@@ -91,42 +94,54 @@ angular.
         sl.d = this.follower.scalarRemoved.listen(ld);
       }
     };
-    CompositeListener.prototype.addScalar = function(scalarname,listenerpack){
+    CompositeListener.prototype.listenToScalars = function(listenerpack){
+      exec.runNext([this,this.listenToScalarsForReal,[listenerpack]]);
+    };
+    CompositeListener.prototype.addScalarForReal = function(scalarname,listenerpack){
+      if(this.listeners===null){
+        return;
+      }
       var sl = this._getClearListener(scalarname);
       var sv = this.follower.scalars[scalarname];
       var la = listenerpack.activator;
       if(la){
         sl.a = this.follower.newScalar.sublisten(scalarname,la);
         if(typeof sv !== 'undefined'){
-          exec.callNext([exec,exec.run],la);
-          //exec.run(la);
+          //exec.callNext([exec,exec.run],la);
+          exec.run(la);
         }
       }
       var ls = listenerpack.setter;
       if(ls){
         sl.s = this.follower.scalarChanged.sublisten(scalarname,ls);
         if(typeof sv !== 'undefined'){
-          exec.applyNext([exec,exec.call],[ls,sv]);
-          //exec.call(ls,sv);
+          //exec.applyNext([exec,exec.call],[ls,sv]);
+          exec.call(ls,sv);
         }
       }
       var ld = listenerpack.deactivator;
       if(ld){
         sl.d = this.follower.scalarRemoved.sublisten(scalarname,ld);
         if(typeof sv === 'undefined'){
-          exec.callNext([exec,exec.run],ld);
-          //exec.run(ld);
+          //exec.callNext([exec,exec.run],ld);
+          exec.run(ld);
         }
       }
     };
-    CompositeListener.prototype.listenToCollections = function(listenerpack){
+    CompositeListener.prototype.addScalar = function(scalarname,listenerpack){
+      exec.runNext([this,this.addScalarForReal,[scalarname,listenerpack]]);
+    };
+    CompositeListener.prototype.listenToCollectionsForReal = function(listenerpack){
+      if(this.listeners===null){
+        return;
+      }
       var sl = this._getClearListener('/collections/');
       var la = listenerpack.activator;
       if(la){
         sl.a = this.follower.newCollection.listen(la);
         for(var i in this.follower.collections){
-          exec.applyNext([exec,exec.call],[la,i]);
-          //exec.call(la,i);
+          //exec.applyNext([exec,exec.call],[la,i]);
+          exec.call(la,i);
         }
       }
       var ld = listenerpack.deactivator;
@@ -134,25 +149,34 @@ angular.
         sl.d = this.follower.collectionRemoved.listen(ld);
       }
     };
-    CompositeListener.prototype.addCollection = function(collectionname,listenerpack){
+    CompositeListener.prototype.listenToCollections = function(listenerpack){
+      exec.runNext([this,this.listenToCollectionsForReal,[listenerpack]]);
+    };
+    CompositeListener.prototype.addCollectionForReal = function(collectionname,listenerpack){
+      if(this.listeners===null){
+        return;
+      }
       var sl = this._getClearListener(collectionname);
       var la = listenerpack.activator;
       var collectiondefined = typeof this.follower.collections[collectionname] !== 'undefined';
       if(la){
         sl.a = this.follower.newCollection.sublisten(collectionname,la);
         if(collectiondefined){
-          exec.callNext([exec,exec.run],la);
-          //exec.run(la);
+          //exec.callNext([exec,exec.run],la);
+          exec.run(la);
         }
       }
       var ld = listenerpack.deactivator;
       if(ld){
         sl.d = this.follower.collectionRemoved.sublisten(collectionname,ld);
         if(!collectiondefined){
-          exec.callNext([exec,exec.run],ld);
-          //exec.run(ld);
+          //exec.callNext([exec,exec.run],ld);
+          exec.run(ld);
         }
       }
+    };
+    CompositeListener.prototype.addCollection = function(collectionname,listenerpack){
+      exec.runNext([this,this.addCollectionForReal,[collectionname,listenerpack]]);
     };
     function destroyListenerChild(l,li){
       for(var i in l){
